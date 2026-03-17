@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทะเบียนนักเรียน - SmartGate Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1rem; }
+        input, select { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; width: 100%; outline: none; transition: 0.3s; }
+        input:focus, select:focus { border-color: #06b6d4; }
+        .input-error { border-color: #f43f5e !important; }
+    </style>
+</head>
+<body class="h-screen w-full flex items-center justify-center p-6 overflow-y-auto">
+
+    <div class="glass-card w-full max-w-5xl p-8 shadow-2xl">
+        <div class="flex justify-between items-center border-b border-white/10 pb-4 mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">➕ ลงทะเบียนนักเรียนใหม่ (พร้อมรูปถ่าย)</h2>
+                <p class="text-slate-400 text-sm mt-1">สแกนบัตรและถ่ายรูปใบหน้าเพื่อใช้สำหรับ AI ตรวจสอบ</p>
+            </div>
+            <a href="/" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors border border-slate-600">🏠 กลับหน้าหลัก</a>
+        </div>
+
+        <form id="regForm" onsubmit="saveStudent(event)" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="space-y-4 md:col-span-1">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">รหัสนักเรียน (10 หลัก)</label>
+                    <input type="text" id="student_id" placeholder="เช่น 6610110688" required maxlength="10" oninput="checkIdLength()">
+                    <p id="idWarning" class="text-rose-400 text-xs mt-1 hidden font-medium">⚠️ ต้องมี 10 หลักพอดี</p>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">คำนำหน้า ชื่อ และ นามสกุล</label>
+                    <div class="flex gap-2">
+                        <select id="prefix" style="width: 35%;" required>
+                            <option value="เด็กชาย">เด็กชาย</option>
+                            <option value="เด็กหญิง">เด็กหญิง</option>
+                            <option value="นาย">นาย</option>
+                            <option value="นางสาว">นางสาว</option>
+                            <option value="">อื่นๆ</option>
+                        </select>
+                        <input type="text" id="firstname" style="width: 32.5%;" placeholder="ชื่อ" required>
+                        <input type="text" id="lastname" style="width: 32.5%;" placeholder="นามสกุล" required>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">ระดับชั้น</label>
+                        <select id="level" required><option value="อ.">อ.</option><option value="ป.">ป.</option><option value="ม.">ม.</option></select>
+                    </div>
+                    <div><label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">ชั้นปี</label><input type="number" id="class_year" placeholder="1-6" required min="1" max="6"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">ห้อง</label><input type="number" id="room" placeholder="1-15" required min="1"></div>
+                </div>
+            </div>
+
+            <div class="space-y-4 flex flex-col justify-center bg-slate-900/50 p-4 rounded-xl border border-white/5 md:col-span-1">
+                <label class="block text-xs text-cyan-400 mb-1 uppercase tracking-wider font-bold text-center">📸 ถ่ายภาพใบหน้า (ต้นฉบับ)</label>
+                <div class="relative w-full aspect-square bg-black rounded-lg overflow-hidden border border-slate-700">
+                    <video id="webcam" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <canvas id="canvas" class="hidden w-full h-full object-cover absolute top-0 left-0"></canvas>
+                </div>
+                <button type="button" onclick="takeSnapshot()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition-all border border-purple-400/50">
+                    📷 แชะ! ถ่ายภาพ
+                </button>
+                <input type="hidden" id="photoData"> </div>
+
+            <div class="space-y-4 flex flex-col justify-center bg-slate-900/50 p-6 rounded-xl border border-white/5 md:col-span-1">
+                <div class="text-center mb-2">
+                    <button type="button" id="scannerBtn" onclick="connectScanner()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all border border-blue-400/50">
+                        🔌 เชื่อมต่อสแกนเนอร์ USB
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-xs text-cyan-400 mb-1 uppercase tracking-wider font-bold">รหัสบัตร (EPC Code)</label>
+                    <input type="text" id="epc_code" placeholder="รอการสแกนบัตร..." readonly class="bg-cyan-950/30 border-cyan-500/50 text-cyan-300 font-mono text-center text-lg placeholder-cyan-800">
+                </div>
+            </div>
+
+            <div class="md:col-span-3 pt-4 border-t border-white/10 flex justify-end">
+                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-12 rounded-lg shadow-lg transition-all border border-emerald-400/50 text-lg w-full md:w-auto">
+                    💾 บันทึกข้อมูลและรูปถ่าย
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // --- ระบบกล้อง WebCam ---
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const photoData = document.getElementById('photoData');
+
+        // ขอสิทธิ์เปิดกล้อง
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { console.error("เข้าถึงกล้องไม่ได้:", err); alert("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตให้ใช้งานกล้อง"); });
+
+        function takeSnapshot() {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            photoData.value = canvas.toDataURL('image/jpeg', 0.8); // เก็บรูปเป็น Base64
+            
+            // โชว์ภาพนิ่งที่ถ่ายได้
+            canvas.classList.remove('hidden');
+            video.classList.add('hidden');
+            
+            // เปลี่ยนปุ่มเป็น ถ่ายใหม่
+            event.target.innerText = "🔄 ถ่ายใหม่";
+            event.target.onclick = retakeSnapshot;
+        }
+
+        function retakeSnapshot() {
+            canvas.classList.add('hidden');
+            video.classList.remove('hidden');
+            photoData.value = "";
+            event.target.innerText = "📷 แชะ! ถ่ายภาพ";
+            event.target.onclick = takeSnapshot;
+        }
+
+        // --- ระบบเช็คความยาวรหัส ---
+        function checkIdLength() {
+            const input = document.getElementById('student_id');
+            const val = input.value;
+            const warning = document.getElementById('idWarning');
+            if (val.length > 0 && val.length !== 10) { warning.classList.remove('hidden'); input.classList.add('input-error'); } 
+            else { warning.classList.add('hidden'); input.classList.remove('input-error'); }
+        }
+
+        // --- ระบบสแกนผ่าน Server (SSE) ---
+        const evtSource = new EventSource('/api/events');
+        evtSource.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'unknown_card') {
+                document.getElementById('epc_code').value = data.epc_code;
+                const btn = document.getElementById('scannerBtn');
+                btn.innerHTML = '✅ ตรวจพบรหัสบัตรแล้ว (จาก Server)';
+                btn.classList.replace('bg-blue-600', 'bg-cyan-600');
+                // กะพริบเพื่อบอกให้รู้ว่ามาแล้ว
+                document.getElementById('epc_code').classList.add('ring-2', 'ring-cyan-400');
+                setTimeout(() => document.getElementById('epc_code').classList.remove('ring-2', 'ring-cyan-400'), 2000);
+            }
+        };
+
+        window.onload = () => {
+            const epc = new URLSearchParams(window.location.search).get('epc');
+            if (epc) {
+                document.getElementById('epc_code').value = epc;
+                const btn = document.getElementById('scannerBtn');
+                btn.innerHTML = '✅ รหัสถูกส่งมาแล้ว'; btn.classList.replace('bg-blue-600', 'bg-emerald-600');
+                btn.disabled = true; btn.classList.add('cursor-not-allowed', 'opacity-80');
+            }
+        };
+
+        let port;
+        async function connectScanner() {
+            try {
+                port = await navigator.serial.requestPort(); 
+                await port.open({ baudRate: 9600 });
+                document.getElementById('scannerBtn').innerText = '✅ พร้อมสแกน';
+                document.getElementById('scannerBtn').classList.replace('bg-blue-600', 'bg-emerald-600');
+                readSerial();
+            } catch (err) { alert('❌ ยกเลิกเชื่อมต่อ'); }
+        }
+
+        async function readSerial() {
+            const reader = port.readable.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    for (let char of decoder.decode(value, { stream: true })) {
+                        if (/[a-zA-Z0-9]/.test(char)) buffer += char;
+                        else { if (buffer.length > 5) document.getElementById('epc_code').value = buffer; buffer = ""; }
+                    }
+                }
+            } catch (err) { console.error(err); } finally { reader.releaseLock(); }
+        }
+
+        // --- บันทึกข้อมูล ---
+        async function saveStudent(e) {
+            e.preventDefault();
+            
+            const sid = document.getElementById('student_id').value;
+            if (sid.length !== 10) return alert('⚠️ รหัสต้องมี 10 หลัก');
+            if (!photoData.value) return alert('⚠️ กรุณาถ่ายภาพก่อนบันทึก!');
+            if (!document.getElementById('epc_code').value) return alert('⚠️ กรุณาสแกนบัตร!');
+
+            const fullName = `${document.getElementById('prefix').value}${document.getElementById('firstname').value.trim()} ${document.getElementById('lastname').value.trim()}`;
+
+            const data = {
+                student_id: sid,
+                name: fullName,
+                level: document.getElementById('level').value,
+                class_year: document.getElementById('class_year').value,
+                room: document.getElementById('room').value,
+                epc_code: document.getElementById('epc_code').value,
+                photo: photoData.value // ส่งรูปภาพไปเซิร์ฟเวอร์ด้วย
+            };
+
+            try {
+                const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify([data]) });
+                const result = await res.json();
+                if (result.success) {
+                    alert('✅ บันทึกสำเร็จ!');
+                    window.location.href = '/register'; // รีโหลดหน้าเพื่อรีเซ็ตกล้องและฟอร์ม
+                } else alert('❌ ผิดพลาด: ' + result.message); 
+            } catch (err) { alert('❌ เชื่อมต่อไม่ได้'); }
+        }
+    </script>
+</body>
+</html>

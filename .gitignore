@@ -1,0 +1,59 @@
+# ════════════════════════════════════════════════
+# SmartGate Pro — .gitignore
+# ════════════════════════════════════════════════
+
+# ── Secrets & Environment ──────────────────────
+.env
+*.pem
+*.ppk
+keys/
+
+# ── Node.js ───────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Database ──────────────────────────────────
+database/school.db
+database/school.db-shm
+database/school.db-wal
+database.sqlite
+*.db
+*.db-shm
+*.db-wal
+
+# ── Python ────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ── Logs & Data ───────────────────────────────
+*.log
+server_error.log
+data/attendance_log.csv
+data/ai_insights.json
+
+# ── Binary / Executables ──────────────────────
+ngrok.exe
+*.exe
+
+# ── Output files (รายงาน/presentation) ────────
+*.docx
+*.pptx
+
+# ── OS / Editor ───────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Photos (นักเรียน จะหนักเกินไป) ────────────
+public/photos/*.jpg
+public/photos/*.jpeg
+public/photos/*.png
+!public/photos/.gitkeep
+
+# ── Face Models (ใหญ่เกิน 100MB ใช้ CDN แทน) ─
+# models/  ← uncomment ถ้า models ใหญ่เกิน

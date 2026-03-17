@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartGate Pro - Intelligence Analytics</title>
+    <script>
+        if (!localStorage.getItem('token')) { window.location.href = '/login'; }
+        function logout() { localStorage.removeItem('token'); window.location.href = '/login'; }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #0d1117; color: #e6edf3; overflow-x: hidden; }
+        .glass { background: rgba(22, 27, 34, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .chart-container { position: relative; height: 100%; width: 100%; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="glass sticky top-0 z-50 px-8 py-4 flex items-center justify-between border-b border-white/5">
+        <div class="flex flex-col">
+            <h1 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 leading-tight">Analytics Intelligence</h1>
+            <p class="text-[9px] text-slate-500 font-bold uppercase tracking-[0.3em]">Decision Support System v4.0</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/" class="px-4 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-xl text-[10px] font-black uppercase hover:bg-white/10 transition-all flex items-center gap-2">
+                🏠 หน้าหลัก
+            </a>
+            <button onclick="logout()" class="px-4 py-2 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl text-[10px] font-black uppercase hover:bg-rose-500/20 transition-all">
+                ออกจากระบบ
+            </button>
+        </div>
+    </header>
+
+    <main class="p-6 md:p-8 max-w-[1600px] mx-auto w-full space-y-6">
+        
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="glass p-3 rounded-2xl border-l-4 border-blue-500">
+                <div class="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Total Daily Arrival</div>
+                <div id="statTotal" class="text-2xl font-black text-white">0</div>
+            </div>
+            <div class="glass p-3 rounded-2xl border-l-4 border-emerald-500">
+                <div class="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-0.5">On-Time Perfect</div>
+                <div id="statOnTime" class="text-2xl font-black text-emerald-400">0</div>
+            </div>
+            <div class="glass p-3 rounded-2xl border-l-4 border-rose-500">
+                <div class="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Daily Late Count</div>
+                <div id="statLate" class="text-2xl font-black text-rose-400">0</div>
+            </div>
+            <div class="glass p-3 rounded-2xl border-l-4 border-amber-500">
+                <div class="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Absent/Pending</div>
+                <div id="statAbsent" class="text-2xl font-black text-amber-400">0</div>
+            </div>
+        </div>
+
+        <!-- Main Insights Grid -->
+        <div class="grid grid-cols-12 gap-4">
+            
+            <!-- Trend Line (8 cols) -->
+            <div class="col-span-12 lg:col-span-8 glass p-5 rounded-3xl min-h-[300px] flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-sm font-black text-blue-400 uppercase tracking-widest">Attendance Velocity</h2>
+                        <p class="text-[10px] text-slate-500 font-bold">Historical data for the last period</p>
+                    </div>
+                    <select id="trendFilter" class="bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] font-black text-blue-400 outline-none" onchange="loadTrendData()">
+                        <option value="7">LAST 7 DAYS</option>
+                        <option value="14">LAST 14 DAYS</option>
+                        <option value="30">LAST 30 DAYS</option>
+                    </select>
+                </div>
+                <div class="flex-1 min-h-[200px]">
+                    <canvas id="trendLineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Daily Mix (4 cols) -->
+            <div class="col-span-12 lg:col-span-4 glass p-5 rounded-3xl flex flex-col">
+                <h2 class="text-xs font-black text-emerald-400 uppercase tracking-widest mb-0.5">Attendance Distribution</h2>
+                <p class="text-[9px] text-slate-500 font-bold mb-4">Daily composition by status</p>
+                <div class="flex-1 flex items-center justify-center min-h-[200px] relative">
+                    <canvas id="dailyPieChart"></canvas>
+                </div>
+                <div id="pieLabels" class="grid grid-cols-3 gap-2 mt-4">
+                    <!-- Labels via JS -->
+                </div>
+            </div>
+
+            <!-- Time Density (4 cols) -->
+            <div class="col-span-12 md:col-span-6 lg:col-span-4 glass p-5 rounded-3xl flex flex-col">
+                <h2 class="text-xs font-black text-purple-400 uppercase tracking-widest mb-0.5">Inbound Density</h2>
+                <p class="text-[9px] text-slate-500 font-bold mb-4">Volume per 10-minute interval</p>
+                <div class="flex-1 min-h-[180px]">
+                    <canvas id="timeDensityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Class Comparison (4 cols) -->
+            <div class="col-span-12 md:col-span-6 lg:col-span-4 glass p-5 rounded-3xl flex flex-col">
+                <h2 class="text-xs font-black text-amber-400 uppercase tracking-widest mb-0.5">Class Comparison</h2>
+                <p class="text-[9px] text-slate-500 font-bold mb-4">Top performing classes</p>
+                <div class="flex-1 min-h-[180px]">
+                    <canvas id="classBarChart"></canvas>
+                </div>
+            </div>
+
+            <!-- AI Risks (4 cols) -->
+            <div class="col-span-12 lg:col-span-4 glass p-6 rounded-[32px] flex flex-col max-h-[450px]">
+                <h2 class="text-sm font-black text-rose-400 uppercase tracking-widest mb-1">AI Risk Profiling</h2>
+                <p class="text-[10px] text-slate-500 font-bold mb-6">High probability of recurring tardiness</p>
+                <div id="riskList" class="flex-1 overflow-y-auto pr-2 space-y-3">
+                    <div class="flex items-center justify-center h-full text-[10px] text-slate-600 font-black uppercase tracking-widest italic">
+                        Analyzing behavioral patterns...
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        let charts = {};
+        let totalStudents = 0;
+
+        async function init() {
+            try {
+                const stuRes = await fetch('/api/manage/students').then(r => r.json());
+                if(stuRes.success) totalStudents = stuRes.data.length;
+
+                loadAllData();
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadAllData() {
+            const logs = await fetch('/api/logs').then(r => r.json());
+            
+            // Fix: Identify the LATEST data available in logs to avoid timezone mismatch
+            let targetDate = new Date().toISOString().split('T')[0];
+            if (logs.length > 0) {
+                const availableDates = [...new Set(logs.map(l => l.date))].sort().reverse();
+                targetDate = availableDates[0];
+            }
+            
+            const todayLogs = logs.filter(l => l.date === targetDate);
+
+            renderDailyMix(todayLogs);
+            renderTimeDensity(logs.filter(l => l.date === targetDate)); // Peak Time also daily-focused
+            renderClassPerformance(logs.filter(l => l.date === targetDate)); // Performance daily-focused
+            renderRiskList(logs);
+            loadTrendData();
+        }
+
+        function renderDailyMix(todayLogs) {
+            const studentDaily = {};
+            todayLogs.forEach(l => {
+                const id = l.student_id || l.epc_code;
+                if (!studentDaily[id]) studentDaily[id] = { in: null };
+                if (l.type === 'เข้า' && !studentDaily[id].in) studentDaily[id].in = l;
+            });
+
+            const uniqueInArr = Object.values(studentDaily).filter(s => s.in).map(s => s.in);
+            // Fix: Only count explicit Normal status or everything that isn't Late/Waiting for "In" scans
+            const norm = uniqueInArr.filter(l => l.status === 'ปกติ' || (l.status !== 'สาย' && l.status !== 'รอตรวจสอบ' && l.status !== 'Manual' && l.status !== 'Mismatch' && l.status !== 'FaceID')).length;
+            const late = uniqueInArr.filter(l => l.status === 'สาย').length;
+            const skip = Math.max(0, totalStudents - uniqueInArr.length);
+
+            document.getElementById('statTotal').innerText = uniqueInArr.length;
+            document.getElementById('statOnTime').innerText = norm;
+            document.getElementById('statLate').innerText = late;
+            document.getElementById('statAbsent').innerText = skip;
+
+            const ctx = document.getElementById('dailyPieChart').getContext('2d');
+            if (charts.pie) charts.pie.destroy();
+            charts.pie = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['มาปกติ', 'สาย', 'ขาดเรียน'],
+                    datasets: [{
+                        data: [norm, late, skip],
+                        backgroundColor: ['#10b981', '#f43f5e', '#f59e0b'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const labelsHtml = [
+                { l: 'มาปกติ', v: norm, c: 'text-emerald-400' },
+                { l: 'สาย', v: late, c: 'text-rose-400' },
+                { l: 'ขาดเรียน', v: skip, c: 'text-amber-400' }
+            ].map(x => `
+                <div class="text-center">
+                    <div class="text-[8px] font-black text-slate-500 uppercase">${x.l}</div>
+                    <div class="text-sm font-black ${x.c}">${x.v}</div>
+                </div>
+            `).join('');
+            document.getElementById('pieLabels').innerHTML = labelsHtml;
+        }
+
+        async function loadTrendData() {
+            const days = document.getElementById('trendFilter').value;
+            const res = await fetch(`/api/analytics/summary?days=${days}`).then(r => r.json());
+            if (!res.success) return;
+
+            const labels = res.data.map(d => formatDateThai(d.date));
+            const norm = res.data.map(d => d.normal_count);
+            const late = res.data.map(d => d.late_count);
+
+            const ctx = document.getElementById('trendLineChart').getContext('2d');
+            if (charts.line) charts.line.destroy();
+            charts.line = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'NORMAL', data: norm, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 0 },
+                        { label: 'LATE', data: late, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { color: '#64748b', font: { size: 9, weight: 'bold' } } } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#334155', font: { size: 8 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#334155', font: { size: 8 } } }
+                    }
+                }
+            });
+        }
+
+        function renderTimeDensity(logs) {
+            const timeMap = {};
+            logs.filter(l => l.type === 'เข้า' && l.time).forEach(l => {
+                const [h, m] = l.time.split(':');
+                const slot = `${h}:${Math.floor(parseInt(m)/10)*10}`;
+                timeMap[slot] = (timeMap[slot] || 0) + 1;
+            });
+
+            const labels = Object.keys(timeMap).sort();
+            const values = labels.map(l => timeMap[l]);
+
+            const ctx = document.getElementById('timeDensityChart').getContext('2d');
+            if (charts.barTime) charts.barTime.destroy();
+            charts.barTime = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: values, backgroundColor: '#8b5cf6', borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 8 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#475569', font: { size: 8 } } }
+                    }
+                }
+            });
+        }
+
+        function renderClassPerformance(logs) {
+            const classMap = {};
+            logs.filter(l => l.type === 'เข้า' && l.class_room).forEach(l => {
+                if (!classMap[l.class_room]) classMap[l.class_room] = { total: 0, late: 0 };
+                classMap[l.class_room].total++;
+                if (l.status === 'สาย') classMap[l.class_room].late++;
+            });
+
+            const classStats = Object.entries(classMap).map(([name, s]) => ({
+                name,
+                onTimePct: Math.round(((s.total - s.late) / s.total) * 100)
+            })).sort((a,b) => b.onTimePct - a.onTimePct).slice(0, 6);
+
+            const ctx = document.getElementById('classBarChart').getContext('2d');
+            if (charts.barClass) charts.barClass.destroy();
+            charts.barClass = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: classStats.map(s => s.name),
+                    datasets: [{ data: classStats.map(s => s.onTimePct), backgroundColor: '#f59e0b', borderRadius: 4 }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#475569', font: { size: 8 } } },
+                        y: { grid: { display: false }, ticks: { color: '#475569', font: { size: 8 } } }
+                    }
+                }
+            });
+        }
+
+        function renderRiskList(logs) {
+            const stMap = {};
+            logs.filter(l => l.type === 'เข้า').forEach(l => {
+                if (!stMap[l.name]) stMap[l.name] = { total: 0, late: 0 };
+                stMap[l.name].total++;
+                if (l.status === 'สาย') stMap[l.name].late++;
+            });
+
+            const risks = Object.entries(stMap).map(([name, s]) => ({
+                name,
+                lateCount: s.late,
+                risk: Math.round((s.late / s.total) * 100)
+            })).filter(s => s.lateCount > 0).sort((a,b) => b.risk - a.risk).slice(0, 10);
+
+            document.getElementById('riskList').innerHTML = risks.map(s => `
+                <div class="bg-black/20 p-3 rounded-2xl border border-white/5 flex items-center justify-between">
+                    <div>
+                        <div class="text-[11px] font-bold text-slate-200">${s.name}</div>
+                        <div class="text-[8px] font-black text-rose-500 uppercase">${s.lateCount} LATE RECORDED</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-black text-rose-400">${s.risk}%</div>
+                        <div class="w-16 h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+                            <div class="h-full bg-rose-500" style="width: ${s.risk}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `).join('') || '<div class="text-center py-10 text-slate-600 text-[10px] font-black">NO RISKS DETECTED</div>';
+        }
+
+        function formatDateThai(ds) {
+            const d = new Date(ds);
+            return `${d.getDate()}/${d.getMonth()+1}`;
+        }
+
+        init();
+    </script>
+</body>
+</html>

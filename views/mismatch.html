@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ตรวจสอบใบหน้า - SmartGate Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #0f172a; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-2xl font-bold text-orange-400">รายการนักเรียนที่ต้องตรวจสอบใบหน้า</h1>
+            <a href="/" class="px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-white/10 transition-all">กลับหน้าหลัก</a>
+        </div>
+        <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
+            <table class="w-full text-left">
+                <thead class="bg-slate-800/50 text-slate-400 text-xs uppercase">
+                    <tr>
+                        <th class="p-5">เวลา</th>
+                        <th class="p-5">ข้อมูลนักเรียน</th>
+                        <th class="p-5 text-center">สถานะ</th>
+                        <th class="p-5 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="mismatchTable" class="divide-y divide-white/5">
+                    <tr><td colspan="4" class="p-20 text-center text-slate-500">กำลังโหลด...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        async function loadData() {
+            try {
+                const timestamp = new Date().getTime();
+                const [lRes, sRes] = await Promise.all([
+                    fetch(`/api/logs?t=${timestamp}`),
+                    fetch(`/api/students?t=${timestamp}`)
+                ]);
+                const logs = await lRes.json();
+                const students = await sRes.json();
+                const filtered = logs.filter(l => ['รอตรวจสอบ', 'พบหลายใบหน้า', 'Mismatch'].includes(l.status));
+                const tbody = document.getElementById('mismatchTable');
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="p-20 text-center text-emerald-400">ตรวจสอบครบถ้วนแล้ว</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = filtered.map(l => {
+                    const student = students.find(s => s.epc_code === l.epc_code);
+                    const photo = student?.photo || 'https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png';
+                    return `
+                        <tr class="hover:bg-white/5 transition-colors">
+                            <td class="p-5 font-mono text-cyan-400 font-bold">${l.time}</td>
+                            <td class="p-5">
+                                <div class="flex items-center gap-6 bg-slate-900/50 p-3 rounded-xl border border-white/5">
+                                    <div class="flex flex-col items-center">
+                                        <span class="text-[10px] text-slate-500 mb-1 uppercase tracking-widest">รูปฐานข้อมูล</span>
+                                        <img src="${photo}" class="w-16 h-16 rounded-xl object-cover border-2 border-slate-700 shadow-inner">
+                                    </div>
+                                    <div class="h-12 w-px bg-white/10"></div>
+                                    <div class="flex flex-col items-center">
+                                        <span class="text-[10px] text-cyan-500 mb-1 uppercase tracking-widest">รูปตอนสแกน</span>
+                                        <img src="/photos/scan_${l.epc_code}.jpg?t=${timestamp}" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png';" class="w-16 h-16 rounded-xl object-cover border-2 border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+                                    </div>
+                                    <div class="ml-2 w-px h-12 bg-white/5 mx-2 hidden md:block"></div>
+                                    <div class="flex-1">
+                                        <p class="font-bold text-white text-base">${l.name}</p>
+                                        <p class="text-xs text-slate-400 font-mono mt-0.5">ID: ${l.student_id}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-5 text-center">
+                                <span class="px-3 py-1 ${l.status === 'รอตรวจสอบ' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'} border rounded-full text-[10px] font-bold">
+                                    ${l.status}
+                                </span>
+                            </td>
+                            <td class="p-5">
+                                <div class="flex justify-center gap-2">
+                                    <button onclick="updateStatus('${l.epc_code}', 'ปกติ')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-lg">ยืนยันว่าใช่</button>
+                                    <button onclick="updateStatus('${l.epc_code}', 'ฝากบัตร')" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg shadow-lg">ฝากบัตร</button>
+                                </div>
+                            </td>
+                        </tr>`;
+                }).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function updateStatus(epc, newStatus) {
+            const response = await fetch('/api/confirm-checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ epc_code: epc, status: newStatus })
+            });
+            const res = await response.json();
+            if (res.success) { await loadData(); } 
+            else { alert("ผิดพลาด: " + res.message); }
+        }
+        loadData();
+        setInterval(loadData, 5000);
+    </script>
+</body>
+</html>

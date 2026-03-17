@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SmartGate Pro</title>
+    <style>
+        body {
+            background-color: #121826; /* สีพื้นหลังโทนเข้มให้เข้ากับ Dashboard */
+            color: #e2e8f0;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-box {
+            background-color: #1e293b;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 15px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+        }
+        h2 { color: #38bdf8; margin-top: 0; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        label { display: block; margin-bottom: 8px; font-size: 14px; }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #334155;
+            border-radius: 5px;
+            background-color: #0f172a;
+            color: white;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #0ea5e9;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #0284c7; }
+        #errorMsg { color: #fb7185; margin-top: 15px; font-size: 14px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h2>เข้าสู่ระบบผู้ดูแล</h2>
+        <form id="loginForm">
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="username" required>
+            </div>
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit">Login</button>
+            <div id="errorMsg">Username หรือ Password ไม่ถูกต้อง</div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const err = document.getElementById('errorMsg');
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.setItem('token', data.token); // เก็บ Token ไว้ในเบราว์เซอร์
+                    window.location.href = '/'; // ล็อกอินผ่านแล้วเด้งไปหน้า Dashboard
+                } else {
+                    err.style.display = 'block';
+                    err.innerText = data.message;
+                }
+            } catch (error) {
+                err.style.display = 'block';
+                err.innerText = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+            }
+        });
+    </script>
+
+</body>
+</html>

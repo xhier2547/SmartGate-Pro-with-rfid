@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการข้อมูลนักเรียน - SmartGate Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-950 text-slate-200 font-prompt min-h-screen p-6">
+
+    <!-- Header -->
+    <div class="max-w-7xl mx-auto flex justify-between items-center mb-8 bg-slate-900/50 p-6 rounded-2xl border border-white/5 shadow-lg">
+        <div>
+            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 flex items-center gap-3">
+                ⚙️ ระบบจัดการข้อมูลนักเรียน
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">แก้ไข ระดับชั้น ห้องเรียน หรือลบข้อมูลนักเรียนออกจากระบบ</p>
+        </div>
+        <div class="flex gap-4">
+            <button onclick="document.getElementById('csvInput').click()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl shadow-lg transition-all font-medium border border-slate-600 flex items-center gap-2">
+                📤 นำเข้าไฟล์ CSV
+            </button>
+            <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSVImport(this)">
+            <a href="/register" class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-xl shadow-lg shadow-emerald-500/20 transition-all font-medium flex items-center gap-2 border border-emerald-400/30">
+                ➕ เพิ่มนักเรียนใหม่
+            </a>
+            <a href="/" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl shadow-lg transition-all font-medium border border-slate-600 flex items-center gap-2">
+                🏠 กลับหน้าหลัก
+            </a>
+        </div>
+    </div>
+
+    <!-- Search / Filter -->
+    <div class="max-w-7xl mx-auto mb-6 flex gap-4 bg-slate-900/30 p-4 rounded-xl border border-white/5">
+        <input type="text" id="searchInput" placeholder="🔍 ค้นหา ชื่อ หรือ รหัสนักเรียน..." class="flex-1 bg-slate-800/80 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none focus:border-cyan-500 transition-colors" onkeyup="filterTable()">
+        
+        <select id="levelFilter" class="bg-slate-800/80 border border-slate-700 text-white rounded-lg px-4 py-2 outline-none focus:border-cyan-500" onchange="filterTable()">
+            <option value="">ทุกระดับชั้น</option>
+            <option value="อ.">อนุบาล (อ.)</option>
+            <option value="ป.">ประถมศึกษา (ป.)</option>
+            <option value="ม.">มัธยมศึกษา (ม.)</option>
+        </select>
+    </div>
+
+    <!-- Data Table -->
+    <div class="max-w-7xl mx-auto bg-slate-900/50 rounded-2xl border border-white/5 shadow-xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-300">
+                <thead class="bg-slate-800/50 border-b border-white/5 text-slate-400 uppercase text-xs tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4 font-medium">รูปภาพ</th>
+                        <th class="px-6 py-4 font-medium">รหัสนักเรียน</th>
+                        <th class="px-6 py-4 font-medium">ชื่อ-นามสกุล</th>
+                        <th class="px-6 py-4 font-medium">ระดับชั้น</th>
+                        <th class="px-6 py-4 font-medium text-center">RFID / EPC Code</th>
+                        <th class="px-6 py-4 font-medium text-center">แจ้งเตือน</th>
+                        <th class="px-6 py-4 font-medium text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="studentTableBody" class="divide-y divide-white/5">
+                    <tr><td colspan="7" class="text-center py-10 text-slate-500">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-md w-full shadow-2xl transform transition-all scale-95 opacity-0" id="editModalContent">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                <h3 class="text-xl font-bold text-white">✏️ แก้ไขข้อมูลนักเรียน</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-white transition-colors text-2xl">&times;</button>
+            </div>
+            
+            <form id="editForm" onsubmit="saveEdit(event)">
+                <input type="hidden" id="edit_epc_code">
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">รหัสนักเรียน (10 หลัก)</label>
+                        <input type="text" id="edit_student_id" required maxlength="10" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white outline-none focus:border-cyan-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">ชื่อ-นามสกุล</label>
+                        <input type="text" id="edit_name" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white outline-none focus:border-cyan-500">
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">ระดับชั้น</label>
+                            <select id="edit_level" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white outline-none focus:border-cyan-500">
+                                <option value="อ.">อ.</option>
+                                <option value="ป.">ป.</option>
+                                <option value="ม.">ม.</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">ปีที่</label>
+                            <input type="number" id="edit_class_year" required min="1" max="6" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white outline-none focus:border-cyan-500 text-center">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">ห้อง</label>
+                            <input type="number" id="edit_room" required min="1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white outline-none focus:border-cyan-500 text-center">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex gap-3">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-colors font-medium border border-slate-700">ยกเลิก</button>
+                    <button type="submit" class="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl transition-colors font-bold shadow-lg shadow-cyan-500/20">บันทึกการแก้ไข</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Subscription Modal -->
+    <div id="subModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-lg w-full shadow-2xl transform transition-all scale-95 opacity-0" id="subModalContent">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                <div>
+                    <h3 class="text-xl font-bold text-white">🔔 จัดการการแจ้งเตือน LINE</h3>
+                    <p id="sub_student_name" class="text-sm text-cyan-400 font-medium"></p>
+                </div>
+                <button onclick="closeSubscriptionModal()" class="text-slate-400 hover:text-white transition-colors text-2xl">&times;</button>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="bg-slate-800/50 p-4 rounded-xl border border-white/5">
+                    <label class="block text-xs text-slate-400 mb-2 uppercase tracking-wider">วิธีที่ 1: ลงทะเบียนอัตโนมัติ (แนะนำให้ผู้ปกครองทำ)</label>
+                    <div class="text-[11px] text-slate-300 space-y-1 mb-3">
+                        <p>1. ให้ผู้ปกครองเพิ่มเพื่อนกับ LINE Bot ของโรงเรียน</p>
+                        <p>2. พิมพ์รหัสนักเรียน <span class="text-cyan-400 font-bold">10 หลัก</span> ส่งไปในแชท</p>
+                        <p>3. ระบบจะยืนยันและเริ่มส่งแจ้งเตือนทันที</p>
+                    </div>
+                    
+                    <label class="block text-xs text-slate-400 mb-2 uppercase tracking-wider border-t border-white/5 pt-3">วิธีที่ 2: เพิ่มรหัสด้วยตนเอง (สำหรับ Admin)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="new_line_token" placeholder="ใส่ User ID (U...) หรือ Token..." class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-emerald-500">
+                        <button onclick="addSubscription()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-colors">เพิ่ม</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-slate-400 mb-3 uppercase tracking-wider">รายการ Token ที่ลงทะเบียนไว้</label>
+                    <div id="tokenList" class="space-y-2 max-h-48 overflow-y-auto pr-2">
+                        <p class="text-center py-4 text-slate-600 text-sm italic">ไม่มีรายการที่ลงทะเบียน</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <button onclick="closeSubscriptionModal()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-colors font-medium border border-slate-700">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allStudents = [];
+
+        async function loadStudents() {
+            try {
+                const res = await fetch('/api/manage/students');
+                const result = await res.json();
+                if (result.success) {
+                    allStudents = result.data;
+                    renderTable(allStudents);
+                }
+            } catch (err) {
+                console.error("Error loading students:", err);
+                document.getElementById('studentTableBody').innerHTML = `<tr><td colspan="7" class="text-center py-10 text-rose-500 font-bold">❌ ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้</td></tr>`;
+            }
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('studentTableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-400">ว่างเปล่า ไม่มีข้อมูลในระบบ</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.map(s => {
+                const photoSrc = s.photo ? s.photo : 'https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png';
+                return `
+                <tr class="hover:bg-white/5 transition-colors group">
+                    <td class="px-6 py-3">
+                        <img src="${photoSrc}" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png';" class="w-12 h-12 rounded-lg object-cover border border-slate-700">
+                    </td>
+                    <td class="px-6 py-3 font-mono font-bold text-slate-300 group-hover:text-white transition-colors">${s.student_id}</td>
+                    <td class="px-6 py-3 font-medium text-white">${s.name}</td>
+                    <td class="px-6 py-3">
+                        <span class="px-3 py-1 bg-slate-800 text-cyan-300 rounded-full text-xs font-bold border border-cyan-900/50 shadow-inner">
+                            ${s.level || ''}${s.class_year || ''}/${s.room || ''}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-center">
+                        <span class="text-xs font-mono text-slate-500 bg-black/30 px-2 py-1 rounded inline-block">💳 ${s.epc_code}</span>
+                    </td>
+                    <td class="px-6 py-3 text-center">
+                        <button onclick="openSubscriptionModal('${s.student_id}', '${s.name}')" class="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/20 transition-colors" title="ตั้งค่าการแจ้งเตือน">
+                            🔔
+                        </button>
+                    </td>
+                    <td class="px-6 py-3 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="openEditModal('${s.epc_code}')" class="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg border border-blue-500/20 transition-colors" title="แก้ไข">
+                                ✏️
+                            </button>
+                            <button onclick="deleteStudent('${s.epc_code}', '${s.name}')" class="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg border border-rose-500/20 transition-colors" title="ลบข้อมูล">
+                                🗑️
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        function filterTable() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const level = document.getElementById('levelFilter').value;
+            
+            const filtered = allStudents.filter(s => {
+                const matchesSearch = (s.name && s.name.toLowerCase().includes(search)) || (s.student_id && s.student_id.toLowerCase().includes(search));
+                const matchesLevel = level === "" || (s.level === level);
+                return matchesSearch && matchesLevel;
+            });
+            renderTable(filtered);
+        }
+
+        const modal = document.getElementById('editModal');
+        const modalContent = document.getElementById('editModalContent');
+
+        function openEditModal(epc_code) {
+            const student = allStudents.find(s => s.epc_code === epc_code);
+            if (!student) return;
+
+            document.getElementById('edit_epc_code').value = student.epc_code;
+            document.getElementById('edit_student_id').value = student.student_id;
+            document.getElementById('edit_name').value = student.name;
+            document.getElementById('edit_level').value = student.level || 'ป.';
+            document.getElementById('edit_class_year').value = student.class_year || 1;
+            document.getElementById('edit_room').value = student.room || 1;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeEditModal() {
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.remove('flex');
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        async function saveEdit(e) {
+            e.preventDefault();
+            const epc = document.getElementById('edit_epc_code').value;
+            const data = {
+                student_id: document.getElementById('edit_student_id').value,
+                name: document.getElementById('edit_name').value,
+                level: document.getElementById('edit_level').value,
+                class_year: document.getElementById('edit_class_year').value,
+                room: document.getElementById('edit_room').value
+            };
+
+            try {
+                const res = await fetch(`/api/manage/students/${epc}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert('✅ บันทึกการแก้ไขสำเร็จ');
+                    closeEditModal();
+                    loadStudents();
+                } else {
+                    alert('❌ ผิดพลาด: ' + result.message);
+                }
+            } catch (err) {
+                alert('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+            }
+        }
+
+        async function deleteStudent(epc, name) {
+            if (!confirm(`⚠️ คุณแน่ใจหรือไม่ที่จะลบข้อมูลของ: ${name} ?\n(ประวัติการสแกนบัตรรายวันของคนนี้จะถูกลบไปด้วย)`)) return;
+
+            try {
+                const res = await fetch(`/api/manage/students/${epc}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.success) {
+                    alert('✅ ลบข้อมูลนักเรียนสำเร็จ');
+                    loadStudents();
+                } else {
+                    alert('❌ ผิดพลาด: ' + result.message);
+                }
+            } catch (err) {
+                alert('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+            }
+        }
+
+        function handleCSVImport(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: async function(results) {
+                    const data = results.data;
+                    const students = data.map(row => ({
+                        epc_code: row.EPC || row.epc_code || row.tag_id,
+                        student_id: row.ID || row.student_id,
+                        name: row.Name || row.name,
+                        level: row.Level || row.level || 'ป.',
+                        class_year: parseInt(row.Year || row.class_year || 1),
+                        room: parseInt(row.Room || row.room || 1)
+                    })).filter(s => s.student_id && s.name && s.epc_code);
+
+                    if (students.length === 0) {
+                        alert("❌ ไม่พบข้อมูลนักเรียนที่ถูกต้องในไฟล์ CSV\nรูปแบบแนะนำ: ID, Name, EPC, Level, Year, Room");
+                        return;
+                    }
+
+                    if (!confirm(`ต้องการนำเข้านักเรียนจำนวน ${students.length} คน ใช่หรือไม่?`)) {
+                        input.value = '';
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch('/api/manage/bulk-import', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ students })
+                        });
+                        const result = await res.json();
+                        if (result.success) {
+                            alert(`✅ ${result.message}`);
+                            loadStudents();
+                        } else {
+                            alert(`❌ ผิดพลาด: ${result.message}`);
+                        }
+                    } catch (err) {
+                        alert("❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+                    }
+                    input.value = '';
+                }
+            });
+        }
+
+        const subModal = document.getElementById('subModal');
+        const subModalContent = document.getElementById('subModalContent');
+        let currentStudentId = '';
+
+        async function openSubscriptionModal(student_id, name) {
+            currentStudentId = student_id;
+            document.getElementById('sub_student_name').textContent = `นักเรียน: ${name} (${student_id})`;
+            document.getElementById('new_line_token').value = '';
+            
+            subModal.classList.remove('hidden');
+            subModal.classList.add('flex');
+            setTimeout(() => {
+                subModalContent.classList.remove('scale-95', 'opacity-0');
+                subModalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+
+            loadSubscriptions(student_id);
+        }
+
+        function closeSubscriptionModal() {
+            subModalContent.classList.remove('scale-100', 'opacity-100');
+            subModalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                subModal.classList.remove('flex');
+                subModal.classList.add('hidden');
+            }, 200);
+        }
+
+        async function loadSubscriptions(student_id) {
+            const listDiv = document.getElementById('tokenList');
+            listDiv.innerHTML = '<p class="text-center py-4 text-slate-500 text-sm">กำลังโหลด...</p>';
+            
+            try {
+                const res = await fetch(`/api/subscriptions/${student_id}`);
+                const result = await res.json();
+                
+                if (result.success && result.data.length > 0) {
+                    listDiv.innerHTML = result.data.map(sub => `
+                        <div class="flex items-center justify-between bg-slate-800/80 p-3 rounded-lg border border-white/5">
+                            <code class="text-xs text-emerald-400 truncate flex-1 mr-4">${sub.line_token}</code>
+                            <button onclick="deleteSubscription(${sub.id})" class="text-rose-400 hover:text-rose-300 transition-colors p-1" title="ลบ">
+                                🗑️
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    listDiv.innerHTML = '<p class="text-center py-4 text-slate-600 text-sm italic">ไม่มีรายการที่ลงทะเบียน</p>';
+                }
+            } catch (err) {
+                listDiv.innerHTML = '<p class="text-center py-4 text-rose-500 text-sm">เกิดข้อผิดพลาดในการโหลด</p>';
+            }
+        }
+
+        async function addSubscription() {
+            const token = document.getElementById('new_line_token').value.trim();
+            if (!token) return alert('กรุณาใส่ Token');
+
+            try {
+                const res = await fetch('/api/subscriptions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: currentStudentId, line_token: token })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    document.getElementById('new_line_token').value = '';
+                    loadSubscriptions(currentStudentId);
+                } else {
+                    alert('❌ ผิดพลาด: ' + result.message);
+                }
+            } catch (err) {
+                alert('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+            }
+        }
+
+        async function deleteSubscription(id) {
+            if (!confirm('ยืนยันที่จะลบการแจ้งเตือนนี้?')) return;
+            try {
+                const res = await fetch(`/api/subscriptions/${id}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.success) {
+                    loadSubscriptions(currentStudentId);
+                }
+            } catch (err) {
+                alert('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+            }
+        }
+
+        window.addEventListener('load', loadStudents);
+
+    </script>
+</body>
+</html>

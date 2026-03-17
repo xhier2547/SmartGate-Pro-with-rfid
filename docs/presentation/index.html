@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>SmartGate Pro — Pitch Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=Sarabun:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+<style>
+  :root {
+    --bg: #080c12;
+    --bg2: #0f1520;
+    --card: #131b28;
+    --blue: #3b82f6;
+    --blue2: #60a5fa;
+    --green: #10b981;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --purple: #8b5cf6;
+    --cyan: #06b6d4;
+    --pink: #ec4899;
+    --white: #f0f6ff;
+    --gray: #64748b;
+    --gray2: #94a3b8;
+  }
+  .reveal { background: var(--bg); font-family: 'Sarabun', 'Inter', sans-serif; }
+  .reveal .slides section { text-align: left; padding: 0 40px; }
+  
+  /* ── Global ── */
+  .reveal h1, .reveal h2, .reveal h3 { font-family: 'Inter', sans-serif; text-transform: none; letter-spacing: -0.02em; }
+  .reveal p, .reveal li { font-size: 1rem; color: var(--gray2); }
+  .reveal code { font-family: 'Fira Code', monospace; background: #1e293b; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: var(--green); }
+
+  /* ── Slide title bar ── */
+  .slide-header { border-left: 4px solid var(--blue); padding-left: 18px; margin-bottom: 30px; }
+  .slide-header h2 { font-size: 2rem; color: var(--white); margin: 0; }
+  .slide-header p  { font-size: 1rem; color: var(--gray); margin: 4px 0 0; }
+
+  /* ── Cards ── */
+  .cards { display: grid; gap: 16px; }
+  .cards-2 { grid-template-columns: 1fr 1fr; }
+  .cards-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .cards-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .card {
+    background: var(--card);
+    border: 1px solid #1e2d45;
+    border-radius: 14px;
+    padding: 22px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent-color, var(--blue));
+  }
+  .card-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
+  .card h3 { font-size: 1.05rem; color: var(--white); margin: 0 0 8px; }
+  .card p  { font-size: 0.82rem; color: var(--gray2); margin: 0; line-height: 1.6; }
+
+  /* ── KPI ── */
+  .kpi { text-align: center; }
+  .kpi .val { font-size: 3.2rem; font-weight: 900; font-family: 'Inter', sans-serif; background: linear-gradient(135deg, var(--blue), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: block; line-height: 1; }
+  .kpi .label { font-size: 0.78rem; color: var(--gray); margin-top: 6px; }
+
+  /* ── Badge ── */
+  .badge { display: inline-block; background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.4); color: var(--blue2); font-size: 0.72rem; padding: 3px 12px; border-radius: 99px; font-family: 'Inter', sans-serif; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .badge-green  { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.4); color: var(--green); }
+  .badge-yellow { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.4); color: var(--yellow); }
+  .badge-purple { background: rgba(139,92,246,.12); border-color: rgba(139,92,246,.4); color: var(--purple); }
+
+  /* ── Table ── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .data-table th { background: #1e293b; color: var(--gray2); padding: 10px 14px; text-align: left; font-weight: 600; font-family: 'Inter', sans-serif; }
+  .data-table td { border-bottom: 1px solid #1c2a3d; padding: 10px 14px; color: var(--white); }
+  .data-table tr:last-child td { border: none; }
+  .data-table .pass  { color: var(--green); font-weight: 700; }
+  .data-table .fail  { color: var(--red); font-weight: 700; }
+
+  /* ── Flow ── */
+  .flow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .flow-node { background: var(--card); border: 1px solid #1e2d45; border-radius: 10px; padding: 14px 18px; text-align: center; min-width: 110px; }
+  .flow-node .icon { font-size: 1.6rem; display: block; margin-bottom: 6px; }
+  .flow-node .name { font-size: 0.72rem; color: var(--gray2); font-family: 'Inter', sans-serif; }
+  .flow-arrow { color: var(--blue); font-size: 1.4rem; flex-shrink: 0; }
+  .flow-label { font-size: 0.6rem; color: var(--gray); text-align: center; font-family: 'Fira Code', monospace; }
+
+  /* ── Cover specific ── */
+  .cover-logo { font-size: 1rem; font-family: 'Inter', sans-serif; font-weight: 900; letter-spacing: .12em; color: var(--blue2); text-transform: uppercase; margin-bottom: 16px; }
+  .cover h1 { font-size: 4.5rem; font-weight: 900; line-height: 1.0; color: white; margin: 0; }
+  .cover h1 span { background: linear-gradient(135deg, #3b82f6, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .cover .sub { font-size: 1.3rem; color: var(--gray2); margin: 16px 0; font-weight: 300; }
+  .cover .tags { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
+
+  /* ── Glow effect on accent elements ── */
+  .glow-blue { box-shadow: 0 0 30px rgba(59,130,246,.25); }
+  .glow-green { box-shadow: 0 0 30px rgba(16,185,129,.25); }
+
+  /* ── Section backgrounds ── */
+  .reveal .slides section[data-accent="blue"] { background: radial-gradient(ellipse at top right, rgba(59,130,246,.08) 0%, transparent 60%), var(--bg); }
+  .reveal .slides section[data-accent="green"] { background: radial-gradient(ellipse at top right, rgba(16,185,129,.08) 0%, transparent 60%), var(--bg); }
+  .reveal .slides section[data-accent="purple"] { background: radial-gradient(ellipse at top right, rgba(139,92,246,.08) 0%, transparent 60%), var(--bg); }
+
+  /* pricing */
+  .price-card { border-radius: 16px; padding: 28px; position: relative; overflow: hidden; }
+  .price-card.featured { border: 2px solid var(--blue); }
+  .price-card h3 { color: var(--white); font-size: 1.1rem; margin: 0 0 6px; }
+  .price-card .price-val { font-size: 1.8rem; font-weight: 800; font-family: 'Inter', sans-serif; color: var(--yellow); }
+  .price-card ul { list-style: none; padding: 0; margin: 14px 0 0; }
+  .price-card ul li { font-size: 0.78rem; color: var(--gray2); padding: 4px 0; }
+  .price-card ul li::before { content: '✓ '; color: var(--green); }
+
+  /* progress bars */
+  .prog-bar { background: #1e293b; border-radius: 4px; height: 8px; overflow: hidden; margin: 6px 0 16px; }
+  .prog-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--blue), var(--green)); }
+
+  /* led demo */
+  .led-row { display: flex; align-items: center; gap: 16px; background: var(--card); border-radius: 12px; padding: 14px 20px; margin-bottom: 10px; border: 1px solid #1e2d45; }
+  .led-dot { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; }
+  .led-green  { background: var(--green); box-shadow: 0 0 12px var(--green); }
+  .led-yellow { background: var(--yellow); box-shadow: 0 0 12px var(--yellow); }
+  .led-red    { background: var(--red);    box-shadow: 0 0 12px var(--red); }
+  .led-row .status { font-size: 0.9rem; font-weight: 600; color: var(--white); min-width: 160px; }
+  .led-row .action { font-size: 0.75rem; color: var(--gray2); flex: 1; }
+  .led-row .mqtt  { font-family: 'Fira Code', monospace; font-size: 0.72rem; color: var(--blue2); margin-left: auto; background: rgba(59,130,246,.1); padding: 3px 10px; border-radius: 6px; }
+
+  /* number circle */
+  .num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--blue); color: white; font-size: 0.8rem; font-weight: 700; font-family: 'Inter', sans-serif; flex-shrink: 0; }
+  .step-row { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+  .step-row p { margin: 4px 0 0; font-size: 0.82rem; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 1: COVER -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="blue" style="padding:60px 70px;">
+  <div class="cover">
+    <div style="display:flex;gap:10px;margin-bottom:20px;">
+      <span class="badge">IoT Solution</span>
+      <span class="badge badge-green">AI-Powered</span>
+      <span class="badge badge-yellow">LINE Ready</span>
+    </div>
+    <h1>SmartGate<br><span>Pro</span></h1>
+    <p class="sub">ระบบบริหารจัดการการเข้า-ออกโรงเรียนอัจฉริยะ<br>RFID · AI Face Recognition · IoT Feedback</p>
+    <div style="height:1px;background:linear-gradient(90deg,var(--blue),transparent);margin:28px 0;"></div>
+    <p style="font-size:0.9rem;color:var(--gray);margin:0;">
+      นายอภิลักษณ์ จันทร์แก้วเดช &nbsp;·&nbsp; รหัส 6610110688 &nbsp;·&nbsp; ปีการศึกษา 2567
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 2: PROBLEM -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="blue">
+  <div class="slide-header">
+    <h2>ปัญหาที่โรงเรียนเผชิญอยู่ทุกวัน</h2>
+    <p>ระบบเดิมไม่เพียงพอสำหรับโรงเรียนยุคใหม่</p>
+  </div>
+  <div class="cards cards-2">
+    <div class="card" style="--accent-color:var(--red);">
+      <span class="card-icon">⏱️</span>
+      <h3>เสียเวลา 10+ นาที/วัน</h3>
+      <p>การเช็คชื่อด้วยมือสะสมเป็น <strong style="color:var(--red)">30+ ชั่วโมง/ปี</strong> ต่อห้องเรียน เวลาที่ควรใช้สอน</p>
+    </div>
+    <div class="card" style="--accent-color:var(--yellow);">
+      <span class="card-icon">📵</span>
+      <h3>ผู้ปกครองไม่รู้ข้อมูล Real-time</h3>
+      <p>ไม่มีระบบแจ้งเตือน ผู้ปกครองต้องโทรถามโรงเรียน ความปลอดภัยเด็กบกพร่อง</p>
+    </div>
+    <div class="card" style="--accent-color:var(--purple);">
+      <span class="card-icon">🃏</span>
+      <h3>การฝากบัตร / โกงเช็คชื่อ</h3>
+      <p>ไม่มีระบบยืนยันตัวตน นักเรียนฝากบัตรกับเพื่อนได้ บันทึกขาดความน่าเชื่อถือ</p>
+    </div>
+    <div class="card" style="--accent-color:var(--gray);">
+      <span class="card-icon">📊</span>
+      <h3>ข้อมูลกระจัดกระจาย</h3>
+      <p>ไม่มี Dashboard ไม่มีสถิติ ผู้บริหารขาดข้อมูลในการตัดสินใจเชิงนโยบาย</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 3: SOLUTION -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="green">
+  <div class="slide-header">
+    <h2>SmartGate Pro แก้ทุกปัญหาด้วย 6 เทคโนโลยี</h2>
+    <p>ออกแบบมาเพื่อโรงเรียนโดยเฉพาะ</p>
+  </div>
+  <div class="cards cards-3">
+    <div class="card" style="--accent-color:var(--blue);">
+      <span class="card-icon">🪪</span>
+      <h3>RFID + ESP32</h3>
+      <p>สแกนบัตร < 1 วินาที ผ่าน ID-20LA 125kHz UART ไม่ต้องสัมผัส</p>
+    </div>
+    <div class="card" style="--accent-color:var(--green);">
+      <span class="card-icon">🤖</span>
+      <h3>AI Face Recognition</h3>
+      <p>face-api.js TinyFaceDetector · Best-of-8 Frames · Threshold 0.92 รองรับมุมเอียง 45°</p>
+    </div>
+    <div class="card" style="--accent-color:var(--yellow);">
+      <span class="card-icon">📲</span>
+      <h3>LINE Notification</h3>
+      <p>แจ้งผู้ปกครองทันทีพร้อมชื่อ เวลา สถานะ ผ่าน LINE Messaging API</p>
+    </div>
+    <div class="card" style="--accent-color:var(--purple);">
+      <span class="card-icon">💡</span>
+      <h3>LED + Buzzer IoT</h3>
+      <p>2-Way MQTT Feedback · เขียว/เหลือง/แดงตามผล AI · เห็นผลทันทีที่ประตู</p>
+    </div>
+    <div class="card" style="--accent-color:var(--cyan);">
+      <span class="card-icon">📊</span>
+      <h3>Real-time Dashboard</h3>
+      <p>Server-Sent Events ครูเห็นข้อมูลสด · วิเคราะห์สถิติย้อนหลัง</p>
+    </div>
+    <div class="card" style="--accent-color:var(--pink);">
+      <span class="card-icon">🌐</span>
+      <h3>Remote Access</h3>
+      <p>ngrok / Cloudflare Tunnel · ESP32 ต่างตั้งอยู่คนละ WiFi ก็ทำงานได้</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 4: ARCHITECTURE -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="blue">
+  <div class="slide-header">
+    <h2>Architecture — การทำงาน End-to-End</h2>
+    <p>Bidirectional MQTT · SSE Real-time · REST API</p>
+  </div>
+  <div class="flow" style="justify-content:center;margin:20px 0;">
+    <div class="flow-node">
+      <span class="icon">🪪</span>
+      <div class="name">RFID Card</div>
+    </div>
+    <div style="text-align:center;">
+      <div class="flow-arrow">→</div>
+    </div>
+    <div class="flow-node" style="border-color:var(--blue);">
+      <span class="icon">🧠</span>
+      <div class="name">ESP32</div>
+    </div>
+    <div style="text-align:center;">
+      <div class="flow-arrow" style="color:var(--purple);">→</div>
+      <div class="flow-label">MQTT<br>smartgate/checkin</div>
+    </div>
+    <div class="flow-node" style="border-color:var(--purple);">
+      <span class="icon">☁️</span>
+      <div class="name">HiveMQ</div>
+    </div>
+    <div style="text-align:center;">
+      <div class="flow-arrow">→</div>
+    </div>
+    <div class="flow-node" style="border-color:var(--green);">
+      <span class="icon">⚙️</span>
+      <div class="name">Node.js</div>
+    </div>
+    <div style="text-align:center;">
+      <div class="flow-arrow" style="color:var(--yellow);">→</div>
+    </div>
+    <div class="flow-node" style="border-color:var(--yellow);">
+      <span class="icon">📲</span>
+      <div class="name">LINE</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin:4px 0 16px;">
+    <span style="color:var(--green);font-size:0.8rem;font-family:'Fira Code',monospace;">
+      ← smartgate/feedback → LED 🟢🟡🔴 + Buzzer 🔊
+    </span>
+  </div>
+
+  <div class="cards cards-3" style="margin-top:12px;">
+    <div style="background:var(--card);border-radius:12px;padding:14px;border:1px solid #1e2d45;">
+      <p style="font-size:0.75rem;margin:0;"><strong style="color:var(--blue);">MQTT Topic ส่ง:</strong><br>
+      <code>smartgate/checkin</code><br>ESP32 → Server (UID)</p>
+    </div>
+    <div style="background:var(--card);border-radius:12px;padding:14px;border:1px solid #1e2d45;">
+      <p style="font-size:0.75rem;margin:0;"><strong style="color:var(--green);">MQTT Topic รับ:</strong><br>
+      <code>smartgate/feedback</code><br>Server → ESP32 (ผล AI)</p>
+    </div>
+    <div style="background:var(--card);border-radius:12px;padding:14px;border:1px solid #1e2d45;">
+      <p style="font-size:0.75rem;margin:0;"><strong style="color:var(--yellow);">SSE Dashboard:</strong><br>
+      <code>/api/events</code><br>Server → Browser (Real-time)</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 5: HARDWARE -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="purple">
+  <div class="slide-header">
+    <h2>Hardware — อุปกรณ์และการเชื่อมต่อ</h2>
+    <p>ต้นทุนรวม < 900 บาท / จุดติดตั้ง</p>
+  </div>
+  <table class="data-table">
+    <tr>
+      <th>อุปกรณ์</th><th>รุ่น / สเปค</th><th>GPIO</th><th>ราคา</th>
+    </tr>
+    <tr><td>🧠 ESP32 DevKit</td><td>240MHz Dual-core, WiFi+Bluetooth</td><td>—</td><td>~150฿</td></tr>
+    <tr><td>📡 ID-20LA RFID</td><td>125kHz, UART 9600 baud, Long Range</td><td>RX=16</td><td>~350฿</td></tr>
+    <tr><td>🟢 LED เขียว</td><td>ผ่าน AI ปกติ / เช็คเอาท์</td><td>GPIO 25</td><td>~3฿</td></tr>
+    <tr><td>🟡 LED เหลือง</td><td>มาสาย</td><td>GPIO 26</td><td>~3฿</td></tr>
+    <tr><td>🔴 LED แดง</td><td>AI ไม่ผ่าน / บัตรไม่รู้จัก</td><td>GPIO 32</td><td>~3฿</td></tr>
+    <tr><td>🔊 Passive Buzzer</td><td>เสียงแจ้งเตือนตามผล AI</td><td>GPIO 13</td><td>~15฿</td></tr>
+    <tr><td>📷 USB Webcam</td><td>1080p 30fps สำหรับ AI Face</td><td>USB</td><td>~300฿</td></tr>
+  </table>
+  <div style="margin-top:14px;background:var(--card);border-radius:10px;padding:12px 18px;border:1px solid #1e2d45;">
+    <p style="margin:0;font-size:0.78rem;font-family:'Fira Code',monospace;color:var(--green);">
+      ESP32 GPIO16(RX) ← TX ของ ID-20LA &nbsp;|&nbsp; VCC=3.3V &nbsp;|&nbsp; GND=GND &nbsp;|&nbsp; LED → 220Ω → GND
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 6: AI -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="green">
+  <div class="slide-header">
+    <h2>AI Face Recognition — ป้องกันการฝากบัตร</h2>
+    <p>Best-of-8 Frame Sampling · Euclidean Distance · IndexedDB Cache</p>
+  </div>
+  <div class="cards cards-2">
+    <div>
+      <div class="step-row"><span class="num">1</span><div><strong style="color:var(--white);font-size:0.9rem;">บัตรสแกน → โหลด Descriptor</strong><p>โหลด Face Descriptor 128D จาก IndexedDB Cache (เร็วขึ้น 80%)</p></div></div>
+      <div class="step-row"><span class="num">2</span><div><strong style="color:var(--white);font-size:0.9rem;">ถ่ายภาพ 8 เฟรม / 200ms</strong><p>TinyFaceDetector (เร็ว 10× กว่า SSD MobileNet)</p></div></div>
+      <div class="step-row"><span class="num">3</span><div><strong style="color:var(--white);font-size:0.9rem;">คำนวณ Euclidean Distance</strong><p>เลือก Best Distance จาก 8 frames · Early Exit เมื่อพบ</p></div></div>
+      <div class="step-row"><span class="num">4</span><div><strong style="color:var(--white);font-size:0.9rem;">ตัดสินใจและส่ง Feedback</strong><p>Threshold 0.92 → ผ่าน/สาย/ไม่ผ่าน → MQTT → LED</p></div></div>
+    </div>
+    <div>
+      <table class="data-table">
+        <tr><th>สภาวะ</th><th>Distance</th><th>ผล</th></tr>
+        <tr><td>หน้าตรง แสงดี</td><td><code>0.28–0.38</code></td><td class="pass">✅ ผ่าน</td></tr>
+        <tr><td>หน้าเอียง ~30°</td><td><code>0.42–0.58</code></td><td class="pass">✅ ผ่าน</td></tr>
+        <tr><td>แสงน้อย/กลางคืน</td><td><code>0.55–0.72</code></td><td class="pass">✅ ผ่าน</td></tr>
+        <tr><td>เอียง 45° + มืด</td><td><code>0.75–0.89</code></td><td class="pass">✅ ผ่าน</td></tr>
+        <tr><td>คนละคน (Imposter)</td><td><code>0.93–1.00</code></td><td class="fail">🚫 ปฏิเสธ</td></tr>
+      </table>
+      <div style="margin-top:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray2);margin-bottom:4px;"><span>Distance 0.0</span><span>Threshold 0.92</span><span>1.0</span></div>
+        <div style="background:#1e293b;border-radius:6px;height:12px;position:relative;overflow:visible;">
+          <div style="background:linear-gradient(90deg,var(--green),var(--yellow));height:100%;width:92%;border-radius:6px;"></div>
+          <div style="position:absolute;top:-4px;right:8%;width:2px;height:20px;background:var(--red);"></div>
+        </div>
+        <p style="font-size:0.68rem;text-align:right;color:var(--red);margin:4px 4px 0;">← Reject zone</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 7: LED/BUZZER -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="purple">
+  <div class="slide-header">
+    <h2>LED + Buzzer — 2-Way IoT Feedback</h2>
+    <p>ESP32 รับคำสั่งจาก Server ผ่าน MQTT · แสดงผลทันทีที่ประตู</p>
+  </div>
+
+  <div class="led-row">
+    <div class="led-dot led-green"></div>
+    <span class="status">🟢 ผ่าน AI (ปกติ)</span>
+    <span class="action">LED เขียว 1 วิ · Beep 1800Hz 100ms</span>
+    <span class="mqtt">'pass'</span>
+  </div>
+  <div class="led-row">
+    <div class="led-dot led-yellow"></div>
+    <span class="status">🟡 มาสาย</span>
+    <span class="action">LED เหลือง 1.5 วิ · Beep 2 ครั้ง</span>
+    <span class="mqtt">'late'</span>
+  </div>
+  <div class="led-row">
+    <div class="led-dot led-red"></div>
+    <span class="status">🔴 AI ไม่ผ่าน</span>
+    <span class="action">LED แดง 2 วิ · Buzz ยาว 500Hz 1.5 วิ</span>
+    <span class="mqtt">'fail'</span>
+  </div>
+  <div class="led-row">
+    <div class="led-dot led-red" style="animation:blink 0.4s infinite;"></div>
+    <span class="status">❓ บัตรไม่รู้จัก</span>
+    <span class="action">LED แดงกะพริบ 3× · Beep 3 ครั้งสั้น</span>
+    <span class="mqtt">'unknown'</span>
+  </div>
+  <div class="led-row">
+    <div class="led-dot led-green"></div>
+    <span class="status">🚪 เช็คเอาท์ (ออก)</span>
+    <span class="action">LED เขียวสั้น 0.6 วิ · Beep เบา 1600Hz</span>
+    <span class="mqtt">'checkout'</span>
+  </div>
+
+  <style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0.1}}</style>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 8: RESULTS -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="green">
+  <div class="slide-header">
+    <h2>ผลลัพธ์จริงที่วัดได้</h2>
+    <p>ทดสอบต่อเนื่อง 8+ ชั่วโมง ไม่พบ crash</p>
+  </div>
+
+  <div class="cards cards-4" style="margin-bottom:20px;">
+    <div class="card kpi" style="--accent-color:var(--blue);">
+      <span class="val">&lt;3s</span>
+      <div class="label">เวลา End-to-End<br>ทั้งกระบวนการ</div>
+    </div>
+    <div class="card kpi" style="--accent-color:var(--green);">
+      <span class="val">100%</span>
+      <div class="label">อัตโนมัติ<br>ไม่ต้องเรียกชื่อ</div>
+    </div>
+    <div class="card kpi" style="--accent-color:var(--yellow);">
+      <span class="val">8×</span>
+      <div class="label">Frame Sampling<br>ต่อการสแกน</div>
+    </div>
+    <div class="card kpi" style="--accent-color:var(--purple);">
+      <span class="val">3×</span>
+      <div class="label">Anti-duplicate<br>Layers</div>
+    </div>
+  </div>
+
+  <div class="cards cards-2">
+    <div>
+      <div class="step-row" style="margin-bottom:10px;"><span style="color:var(--green);font-size:1rem;">✅</span><p style="margin:0;font-size:0.82rem;color:var(--white);">ป้องกัน Race Condition ด้วย Memory Lock ระดับ ms</p></div>
+      <div class="step-row" style="margin-bottom:10px;"><span style="color:var(--green);font-size:1rem;">✅</span><p style="margin:0;font-size:0.82rem;color:var(--white);">SQLite WAL Mode รองรับ Concurrent Read/Write</p></div>
+      <div class="step-row" style="margin-bottom:10px;"><span style="color:var(--green);font-size:1rem;">✅</span><p style="margin:0;font-size:0.82rem;color:var(--white);">IndexedDB Cache ลด AI load time 80%</p></div>
+    </div>
+    <div>
+      <div class="step-row" style="margin-bottom:10px;"><span style="color:var(--green);font-size:1rem;">✅</span><p style="margin:0;font-size:0.82rem;color:var(--white);">Debounce Cache 10 วิ ป้องกันสแกนซ้ำ</p></div>
+      <div class="step-row" style="margin-bottom:10px;"><span style="color:var(--green);font-size:1rem;">✅</span><p style="margin:0;font-size:0.82rem;color:var(--white);">JWT Authentication ป้องกัน Dashboard</p></div>
+      <div class="step-row" style="margin-bottom:10px;"><span style="color:var(--green);font-size:1rem;">✅</span><p style="margin:0;font-size:0.82rem;color:var(--white);">MQTT Auto-reconnect เมื่อ Network หลุด</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 9: PRICING -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="blue">
+  <div class="slide-header">
+    <h2>แพ็กเกจสำหรับโรงเรียน</h2>
+    <p>Hardware ต้นทุน < 900 บาท / จุดติดตั้ง</p>
+  </div>
+  <div class="cards cards-3">
+    <div class="price-card" style="background:var(--card);border:1px solid #1e2d45;">
+      <span class="badge" style="margin-bottom:12px;display:inline-block;">🥉 Starter</span>
+      <h3>Self-Hosted</h3>
+      <div class="price-val">ฟรี</div>
+      <ul>
+        <li>ESP32 + RFID 1 จุด</li>
+        <li>Web Dashboard</li>
+        <li>LINE Notification</li>
+        <li>≤ 500 นักเรียน</li>
+      </ul>
+    </div>
+    <div class="price-card featured glow-blue" style="background:rgba(59,130,246,.08);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span class="badge">🥇 Pro</span>
+        <span style="background:var(--blue);color:white;font-size:0.65rem;padding:3px 10px;border-radius:99px;font-weight:700;">แนะนำ</span>
+      </div>
+      <h3>สำหรับโรงเรียน</h3>
+      <div class="price-val">ติดต่อสอบถาม</div>
+      <ul>
+        <li>2 จุดสแกน (2 ประตู)</li>
+        <li>LED/Buzzer Feedback</li>
+        <li>AI Face Recognition</li>
+        <li>Remote Access + Support</li>
+      </ul>
+    </div>
+    <div class="price-card" style="background:var(--card);border:1px solid #1e2d45;">
+      <span class="badge badge-purple" style="margin-bottom:12px;display:inline-block;">🏆 Enterprise</span>
+      <h3>Smart Campus</h3>
+      <div class="price-val">กำหนดเอง</div>
+      <ul>
+        <li>ไม่จำกัดจุดสแกน</li>
+        <li>IP Camera ติดตรึง</li>
+        <li>Python AI (InsightFace)</li>
+        <li>Mobile App ผู้ปกครอง</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<!-- SLIDE 10: CLOSING -->
+<!-- ══════════════════════════════════════ -->
+<section data-accent="green" style="text-align:center;padding:50px 60px;">
+  <div style="max-width:700px;margin:0 auto;">
+    <div style="font-size:3rem;margin-bottom:20px;">🚀</div>
+    <h2 style="font-size:2.8rem;color:white;margin:0 0 12px;line-height:1.1;">พร้อมเปลี่ยนโรงเรียน<br>ให้เป็น <span style="background:linear-gradient(135deg,var(--blue),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Smart School</span>?</h2>
+    <p style="font-size:1rem;color:var(--gray2);margin:16px 0 28px;">SmartGate Pro ช่วยครูประหยัดเวลา ผู้ปกครองสบายใจ<br>และผู้บริหารมีข้อมูลตัดสินใจ ด้วยต้นทุน < 900 บาท/จุด</p>
+    <div style="height:1px;background:linear-gradient(90deg,transparent,var(--green),transparent);margin:24px 0;"></div>
+    <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:24px;">
+      <span class="badge">Node.js</span>
+      <span class="badge badge-green">ESP32</span>
+      <span class="badge badge-yellow">face-api.js</span>
+      <span class="badge badge-purple">MQTT</span>
+      <span class="badge">SQLite</span>
+      <span class="badge badge-green">LINE API</span>
+    </div>
+    <p style="font-size:0.85rem;color:var(--gray);">
+      นายอภิลักษณ์ จันทร์แก้วเดช &nbsp;·&nbsp; รหัส 6610110688 &nbsp;·&nbsp; ปีการศึกษา 2567
+    </p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  transition: 'slide',
+  transitionSpeed: 'fast',
+  backgroundTransition: 'fade',
+  controls: true,
+  progress: true,
+  center: false,
+  width: 1280,
+  height: 720,
+  margin: 0.04,
+  plugins: []
+});
+</script>
+</body>
+</html>

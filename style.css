@@ -1,0 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+
+:root { 
+    --bg-dark: #0f172a; 
+    --card-bg: rgba(30, 41, 59, 0.6); 
+    --card-border: rgba(255, 255, 255, 0.08); 
+}
+body { 
+    font-family: 'Prompt', sans-serif; 
+    background: var(--bg-dark); 
+    color: #f8fafc; 
+}
+.glass-card { 
+    background: var(--card-bg); 
+    backdrop-filter: blur(12px); 
+    -webkit-backdrop-filter: blur(12px); 
+    border: 1px solid var(--card-border); 
+    border-radius: 1rem; 
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
+
+.btn-hover { transition: all 0.2s ease; cursor: pointer; }
+.btn-hover:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+/* Animation สำหรับ Progress bar */
+.progress-bar { transition: width 1s ease-in-out; }
