@@ -11,7 +11,7 @@ const { SerialPort } = require('serialport');
 require('dotenv').config();  // ← โหลด .env
 
 const app = express();
-app.use('/js', express.static(path.join(__dirname, 'js'), { maxAge: 0 })); 
+app.use('/js', express.static(path.join(__dirname, 'js'), { maxAge: 0 }));
 
 // --- Update Photo from Scan ---
 app.post('/api/manage/update-photo-from-scan', (req, res) => {
@@ -68,7 +68,7 @@ if (!fs.existsSync(photosDir)) {
 db.serialize(() => {
     db.run(`PRAGMA journal_mode=WAL;`);
     db.run(`CREATE TABLE IF NOT EXISTS students (epc_code TEXT PRIMARY KEY, student_id TEXT, name TEXT, class_year TEXT, room TEXT, level TEXT, forgot_count INTEGER DEFAULT 0, score INTEGER DEFAULT 100, photo TEXT, parent_name TEXT, parent_phone TEXT)`);
-    
+
     // --- Database Migration: Add parent info columns if they don't exist ---
     const addColumnIfNotExists = (table, col, type) => {
         db.get(`PRAGMA table_info(${table})`, (err, rows) => {
@@ -77,7 +77,7 @@ db.serialize(() => {
         db.all(`PRAGMA table_info(${table})`, (err, rows) => {
             if (rows && !rows.find(r => r.name === col)) {
                 db.run(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
-                console.log(`📡 Migrated database: Added ${col} to ${table}`);
+                console.log(`Migrated database: Added ${col} to ${table}`);
             }
         });
     };
@@ -96,8 +96,12 @@ db.serialize(() => {
         student_id TEXT,
         line_token TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(student_id, line_token),
         FOREIGN KEY(student_id) REFERENCES students(student_id)
     )`);
+
+    // --- Cleanup: Remove duplicate subscriptions if any exist ---
+    db.run(`DELETE FROM parent_subscriptions WHERE id NOT IN (SELECT MIN(id) FROM parent_subscriptions GROUP BY student_id, line_token)`);
 });
 
 // --- LINE Webhook สำหรับลงทะเบียนอัตโนมัติ ---
@@ -161,7 +165,7 @@ app.get('/api/manage/students', (req, res) => {
 app.put('/api/manage/students/:epc_code', (req, res) => {
     const epc_code = req.params.epc_code;
     const { student_id, name, level, class_year, room, parent_name, parent_phone, photo } = req.body;
-    
+
     let updatePhotoSql = "";
     let params = [student_id, name, level, class_year, room, parent_name || '', parent_phone || ''];
 
@@ -307,7 +311,7 @@ const processScan = (raw_epc) => {
         (err, lastLog) => {
             // NOTE: We moved the 1-minute guard into handleScanLogic for better context (type-aware debounce)
             console.log(`\n${'─'.repeat(50)}`);
-            console.log(`📡 สแกนบัตร: ${epc_code}`);
+            console.log(` สแกนบัตร: ${epc_code}`);
             handleScanLogic(epc_code);
         }
     );
@@ -346,7 +350,7 @@ const handleScanLogic = (epc_code) => {
                     const diffMs = now - lastTime;
 
                     // ถ้าเป็นประเภทเดียวกัน และสแกนภายใน 1 นาที สั่งข้าม (ยกเว้นข้ามวัน/ข้ามชั่วโมงที่ต่างกัน)
-                    if (diffMs >= 0 && diffMs < 60000) { 
+                    if (diffMs >= 0 && diffMs < 60000) {
                         console.log(`⏳ ข้ามการสแกน: ${epc_code} เพิ่งบันทึก "${lastLog.type}" ไปเมื่อไม่กี่วินาทีก่อน`);
                         pendingScans.delete(epc_code);
                         return;
@@ -404,10 +408,10 @@ const handleScanLogic = (epc_code) => {
 // Debug: รับ distance log จาก browser AI พิมพ์ใน terminal
 app.post('/api/face-debug', (req, res) => {
     const { name, sample, distance, pct, threshold, note } = req.body;
-    
+
     if (sample === 'FINAL') {
         const pass = parseFloat(distance) < threshold ? '✅ PASS' : '❌ FAIL';
-        console.log(`🤖 Final Decision: ${name} | AvgDist=${distance} | ${note} | ${pass}`);
+        console.log(`Final Decision: ${name} | AvgDist=${distance} | ${note} | ${pass}`);
         console.log(`${'─'.repeat(50)}`);
         return res.json({ ok: true });
     }
@@ -415,7 +419,7 @@ app.post('/api/face-debug', (req, res) => {
     const filled = Math.max(0, Math.round(pct / 5));
     const bar = '█'.repeat(filled) + '░'.repeat(20 - filled);
     const pass = parseFloat(distance) < threshold ? '✅ PASS' : '❌ ยังไม่ผ่าน';
-    console.log(`   📊 Sample ${sample}: [${bar}] ${pct}% (dist=${distance}) ${pass}`);
+    console.log(`   Sample ${sample}: [${bar}] ${pct}% (dist=${distance}) ${pass}`);
     res.json({ ok: true });
 });
 
@@ -434,13 +438,14 @@ app.delete('/api/delete-attendance/:id', (req, res) => {
 });
 
 app.post('/api/confirm-checkin', (req, res) => {
-    const { epc_code, status, scan_photo, date, time, attendance_id } = req.body;
+    const { epc_code, status, scan_photo, captured_image, date, time, attendance_id } = req.body;
+    const finalPhoto = scan_photo || captured_image;
 
     // คอนเฟิร์มโดยใช้ ID (แม่นยำที่สุด)
     if (attendance_id) {
         db.get(`SELECT id, epc_code, time, type FROM attendance WHERE id = ?`, [attendance_id], (err, row) => {
             if (err || !row) return res.json({ success: false, message: "ไม่พบรายการจาก ID ที่ระบุ" });
-            processConfirmation(row, status, scan_photo, res);
+            processConfirmation(row, status, finalPhoto, res);
         });
     }
     // คอนเฟิร์มโดยใช้ EPC + Date + Time (แบบเดิมสำหรับหน้า Mismatch)
@@ -452,8 +457,15 @@ app.post('/api/confirm-checkin', (req, res) => {
         query += ` ORDER BY id DESC LIMIT 1`;
 
         db.get(query, params, (err, row) => {
-            if (err || !row) return res.json({ success: false, message: "ไม่พบรายการรอตรวจสอบ" });
-            processConfirmation(row, status, scan_photo, res, epc_code);
+            if (err || !row) {
+                // ถ้าไม่มี 'รอตรวจสอบ' ให้ลองหา 'ล่าสุด' (Fallback for monitor.html)
+                db.get(`SELECT id, time, type FROM attendance WHERE epc_code = ? AND date = ? ORDER BY id DESC LIMIT 1`, [epc_code, dateStr], (err2, row2) => {
+                    if (err2 || !row2) return res.json({ success: false, message: "ไม่พบรายการสแกน" });
+                    processConfirmation(row2, status, finalPhoto, res, epc_code);
+                });
+                return;
+            }
+            processConfirmation(row, status, finalPhoto, res, epc_code);
         });
     } else {
         res.json({ success: false, message: "ขาดข้อมูลที่จำเป็น" });
@@ -494,7 +506,7 @@ const triggerCheckinNotifications = (student, epc, time, status, method, attenda
         if (method === 'แมนนวล') displayPrefix += ' (ลืมบัตร)';
         else if (method === 'Face ID') displayPrefix += ' (Face ID)';
 
-        const msg = `📡 [${displayPrefix}] ${student ? student.name : epc}\nเวลา: ${time}\nสถานะ: ${status}`;
+        const msg = ` [${displayPrefix}] ${student ? student.name : epc}\nเวลา: ${time}\nสถานะ: ${status}`;
 
         db.get("SELECT setting_value FROM settings WHERE setting_key = 'LINE_TOKEN'", [], (err, tokenRow) => {
             const lineToken = tokenRow ? tokenRow.setting_value : DEFAULT_LINE_TOKEN;
@@ -745,24 +757,6 @@ app.delete('/api/subscriptions/:id', (req, res) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
         res.json({ success: true, message: "ลบการแจ้งเตือนสำเร็จ" });
     });
-});
-
-// --- Face Confirmation API from Monitor/Manual ---
-app.post('/api/confirm-checkin', (req, res) => {
-    const { epc_code, status, captured_image, attendance_id } = req.body;
-
-    if (attendance_id) {
-        db.get("SELECT * FROM attendance WHERE id = ?", [attendance_id], (err, row) => {
-            if (row) processConfirmation(row, status, captured_image, res, epc_code);
-            else res.json({ success: false, message: "ไม่พบรายการที่ระบุ" });
-        });
-    } else {
-        const dateStr = new Date().toLocaleDateString('en-CA');
-        db.get("SELECT * FROM attendance WHERE epc_code = ? AND date = ? ORDER BY id DESC LIMIT 1", [epc_code, dateStr], (err, row) => {
-            if (row) processConfirmation(row, status, captured_image, res, epc_code);
-            else res.json({ success: false, message: "ไม่พบรายการล่าสุด" });
-        });
-    }
 });
 
 // --- Analytics API ---
