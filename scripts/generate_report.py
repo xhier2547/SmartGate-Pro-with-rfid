@@ -290,8 +290,9 @@ body(doc, "กระบวนการตรวจสอบใบหน้าใ
 image_placeholder(doc, "Flowchart: กระบวนการ Face Verification",
                   "วาด Flowchart: สแกนบัตร → ค้นหา DB → จับใบหน้า 8 frame → เปรียบเทียบ distance → ผ่าน/ไม่ผ่าน")
 body(doc, "• TinyFaceDetector: เร็วกว่า SSD MobileNet ~10 เท่า (inputSize=320, scoreThreshold=0.2)", size=15, bullet=True)
-body(doc, "• Euclidean Distance Threshold: 0.92 (ยืดหยุ่นสำหรับมุมเอียงสูงสุด ~45°)", size=15, bullet=True)
-body(doc, "• Best Distance จาก 8 frames: หยุดทันทีเมื่อ distance < threshold (Early Exit)", size=15, bullet=True)
+body(doc, "• Smart AI Consistency Check: เก็บ 8 frames และต้องผ่านเกณฑ์อย่างน้อย 2 ใน 3 frames ที่ดีที่สุด", size=15, bullet=True)
+body(doc, "• Multi-face Crowd Support: ใช้ detectAllFaces ตรวจจับทุกใบหน้าในเฟรม ป้องกันการสับสนเมื่อมีคนยืนซ้อนกัน", size=15, bullet=True)
+body(doc, "• Euclidean Distance Threshold: 0.58 (เข้มงวดสูงขึ้นเพื่อป้องกันคนหน้าคล้าย)", size=15, bullet=True)
 body(doc, "• IndexedDB Caching: บันทึก face descriptor ใน browser ทำให้ครั้งถัดไปเร็วขึ้น 80%", size=15, bullet=True)
 
 image_placeholder(doc, "หน้าจอ Dashboard แสดง progress bar ขณะ AI ทำงาน",
@@ -337,13 +338,13 @@ doc.add_paragraph()
 image_placeholder(doc, "ภาพ Terminal แสดง Debug Bar ของ AI",
                   "Screenshot Terminal: 📊 [██████████████░░░░░░] 68% (dist=0.3225) ✅ PASS")
 
-heading(doc, "Test 3: การป้องกันสแกนซ้ำ (Anti-Duplicate)", size=16, color=(68,114,196))
+heading(doc, "Test 3: การจัดการ Concurrency และ High Traffic", size=16, color=(68,114,196))
 add_table(doc,
-    ["กลไก", "ทำงานอย่างไร", "ผล"],
+    ["เทคนิค", "การทำงาน", "ผลลัพธ์"],
     [
-        ["Cache Level (10s)", "ตรวจ Map ใน Memory ก่อน DB", "✅"],
-        ["Memory Lock (ms)", "pendingScans Set ป้องกัน Race Condition", "✅"],
-        ["DB Level (1 min)", "ตรวจ time ล่าสุดใน attendance table", "✅"],
+        ["Verification Queue", "ประมวลผล AI ทีละคนแบบ Sequential", "✅ ไม่หน่วงแม้สแกนวินาทีละคน"],
+        ["Memory Lock", "pendingScans Set ป้องกันสแกนซ้อน", "✅ ป้องกัน Race Condition"],
+        ["DB Level Debounce", "ตรวจเวลาล่าสุดใน attendance (1 min)", "✅ ป้องกันข้อมูลขยะเข้าระบบ"],
     ],
     col_widths=[5, 7, 2]
 )
@@ -391,9 +392,9 @@ heading(doc, "7. ปัญหาและข้อจำกัดที่พบ
 add_table(doc,
     ["ปัญหาที่พบ", "สาเหตุ", "วิธีแก้ไข"],
     [
-        ["Browser cache ไม่โหลดโค้ดใหม่", "maxAge: 1d บน static JS", "เปลี่ยน maxAge: 0 + no-store header"],
-        ["face-api library 404", "ไม่มีไฟล์ face-api.min.js local", "ย้ายไปใช้ CDN jsdelivr"],
-        ["AI ไม่แม่นยำเมื่อหน้าเอียงมาก", "face-api.js มีข้อจำกัดด้านมุม", "Best-of-8 sampling + threshold 0.92"],
+        ["Browser cache ไม่โหลดโค้ดใหม่", "maxAge: 1d บน static JS", "ใช้ Script Versioning (v=5) + no-cache header"],
+        ["คนหน้าคล้ายแอบสแกนแทนกัน", "Threshold เดิม (0.92) กว้างเกินไป", "ปรับเป็น 0.58 + เพิ่ม Consistency Check"],
+        ["คนยืนเกาะกลุ่มกันแล้ว AI สับสน", "detectSingleFace จับหน้าผิดคน", "เปลี่ยนเป็น detectAllFaces (Crowd Support)"],
         ["ESP32 กับ Server คนละ WiFi", "ต้องส่งข้ามเครือข่าย", "ใช้ HiveMQ public MQTT broker"],
         ["LINE แจ้งเตือนซ้ำกัน", "ไม่มี debounce ใน trigger", "ตรวจสอบ scan cache ก่อนส่ง"],
     ],

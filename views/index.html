@@ -239,7 +239,7 @@
             <div class="bg-gradient-to-r from-indigo-600 to-blue-600 p-8 text-white relative">
                 <button onclick="closeAIModal()" class="absolute right-6 top-6 hover:rotate-90 transition-transform"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
                 <div class="flex items-center gap-6">
-                    <div class="w-20 h-20 bg-white/10 rounded-[28px] backdrop-blur-md flex items-center justify-center text-4xl">🤖</div>
+                    <div class="w-20 h-20 bg-indigo-500/20 text-indigo-400 rounded-[28px] backdrop-blur-md flex items-center justify-center text-4xl font-black border border-indigo-500/30">AI</div>
                     <div>
                         <h2 class="text-3xl font-black mb-1">AI Smart Insights</h2>
                         <span class="text-xs font-bold text-white/60 uppercase tracking-widest">Advanced Pattern Analysis</span>
@@ -253,8 +253,7 @@
                 </div>
                 <div id="weatherAlertBox" class="hidden bg-blue-500/10 border border-blue-500/20 p-6 rounded-3xl">
                     <div class="flex items-center gap-3 mb-4">
-                        <span class="text-2xl">🌧️</span>
-                        <h4 class="text-sm font-black text-blue-400 uppercase">Weather Impact Detected</h4>
+                        <h4 class="text-sm font-black text-blue-400 uppercase">Weather Impact Analysis</h4>
                     </div>
                     <p class="text-xs text-slate-400 mb-4 font-bold uppercase">The following students arrived late due to rain:</p>
                     <div id="weatherVictimsList" class="flex flex-wrap gap-2"></div>
@@ -356,6 +355,7 @@
 
                 <div class="flex gap-4 w-full">
                     <button id="btnConfirmFace" class="flex-1 py-5 bg-emerald-600 text-white rounded-[30px] font-black text-sm uppercase hover:bg-emerald-500 transition-all shadow-xl shadow-emerald-600/20">ยืนยันตัวตน (มาปกติ)</button>
+                    <button onclick="updateProfileFromScan()" class="px-6 py-5 bg-blue-600/20 text-blue-400 rounded-[30px] font-black text-sm uppercase hover:bg-blue-600/30 transition-all border border-blue-500/30" title="ใช้รูปสแกนนี้เป็นรูปโปรไฟล์">📸 ใช้เป็นรูปโปรไฟล์</button>
                     <button onclick="rejectFace()" class="flex-1 py-5 bg-white/5 text-slate-400 rounded-[30px] font-black text-sm uppercase hover:bg-white/10 transition-all border border-white/10">ปฏิเสธ / ยกเลิก</button>
                     <button id="btnDeleteAttendance" onclick="deleteAttendanceRecord()" class="px-8 py-5 bg-rose-900/40 text-rose-400 rounded-[30px] font-black text-sm uppercase hover:bg-rose-800/50 transition-all border border-rose-500/30" title="ลบและไม่แจ้ง LINE">🗑 ลบ</button>
                 </div>

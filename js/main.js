@@ -185,6 +185,31 @@ async function confirmFaceManual(id) {
     } catch (e) { console.error(e); }
 }
 
+window.updateProfileFromScan = async function() {
+    if (!currentAttendanceId) return;
+    const logs = await (await fetch('/api/logs')).json();
+    const record = logs.find(l => l.id == currentAttendanceId);
+    if (!record) return alert("ไม่พบข้อมูลสำหรับการอัปเดต");
+
+    if (!confirm(`ต้องการใช้รูปสแกนล่าสุดของ ${record.name} เป็นรูปโปรไฟล์หลักใช่หรือไม่?\n(รูปนี้จะถูกใช้เป็นฐานข้อมูลสำหรับ AI ในครั้งถัดไป)`)) return;
+
+    try {
+        const res = await fetch('/api/manage/update-photo-from-scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student_id: record.student_id, epc_code: record.epc_code })
+        }).then(r => r.json());
+
+        if (res.success) {
+            alert(res.message);
+            // Optionally refresh the review modal photo if still open
+            document.getElementById('verifyDbPhoto').src = record.photo + '?v=' + Date.now();
+        } else {
+            alert('ล้มเหลว: ' + res.message);
+        }
+    } catch (e) { alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์'); }
+};
+
 window.rejectFace = function() {
     document.getElementById('verifyFaceModal').classList.add('hidden');
 };

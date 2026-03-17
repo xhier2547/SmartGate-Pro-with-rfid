@@ -252,24 +252,109 @@ window.closeAIModal = function() {
 
 function updateAIInsights() {
     const summaryEl = document.getElementById('aiModalSummary');
-    if (!summaryEl) return;
+    const anomalyEl = document.getElementById('aiModalAnomaly');
+    const clusterEl = document.getElementById('aiModalClusters');
+    if (!summaryEl || !anomalyEl || !clusterEl) return;
 
     if (!allLogs.length) {
-        summaryEl.innerHTML = "No data available for analysis. Please start scanning cards to generate AI insights.";
+        summaryEl.innerHTML = "ระบบยังไม่ได้รับข้อมูลเพียงพอสำหรับการประมวลผลเชิงลึก กรุณารอให้มีการบันทึกการเข้าเรียนเพื่อเริ่มวิเคราะห์รูปแบบพฤติกรรม";
         return;
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const todayLogs = allLogs.filter(l => l.date === today && l.type === 'เข้า');
-    const lates = todayLogs.filter(l => l.status === 'สาย').length;
-    const normals = todayLogs.filter(l => l.status === 'ปกติ').length;
-    
-    let insightStr = `สรุปภาพรวมวันนี้: มีนักเรียนเข้าเรียนทั้งหมด ${todayLogs.length} คน <br>`;
-    if (lates > 0) {
-        insightStr += `<span class="text-rose-400">พบนักเรียนมาสาย ${lates} คน</span> ซึ่งคิดเป็น ${Math.round((lates/todayLogs.length)*100)}% ของนักเรียนที่มาทั้งหมดในวันนี้`;
-    } else if (todayLogs.length > 0) {
-        insightStr += `<span class="text-emerald-400">ยอดเยี่ยมมาก! วันนี้นักเรียนทุกคนมาตรงเวลา</span>`;
+    let targetDate = new Date().toISOString().split('T')[0];
+    if (allLogs.length > 0) {
+        const availableDates = [...new Set(allLogs.map(l => l.date))].filter(d => d).sort().reverse();
+        if (availableDates.length > 0) targetDate = availableDates[0];
     }
 
+    const allTodayIn = allLogs.filter(l => l.date === targetDate && l.type === 'เข้า');
+    
+    // Fix: Count UNIQUE students instead of every single scan record
+    const uniqueStudentIds = [...new Set(allTodayIn.map(l => l.student_id || l.epc_code))];
+    const todayLogsCount = uniqueStudentIds.length;
+    
+    // Filter for unique "Latest" status per student for accurate statistics
+    const latestStatusPerStudent = {};
+    allTodayIn.forEach(l => {
+        const id = l.student_id || l.epc_code;
+        // Use the most recent log of the day to determine their final status for the summary
+        if (!latestStatusPerStudent[id] || l.time > latestStatusPerStudent[id].time) {
+            latestStatusPerStudent[id] = l;
+        }
+    });
+    
+    const uniqueEntriesArray = Object.values(latestStatusPerStudent);
+    const totalStudentsInDB = allStudents.length || 1;
+    const lates = uniqueEntriesArray.filter(l => l.status === 'สาย').length;
+    const onTimes = uniqueEntriesArray.filter(l => l.status === 'ปกติ' || (l.status !== 'สาย' && l.status !== 'รอตรวจสอบ')).length;
+    const attendanceRate = Math.round((todayLogsCount / totalStudentsInDB) * 100);
+    
+    // 1. Daily Summary (Technical/Professional)
+    let insightStr = `<div class="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-2">
+        <div class="flex justify-between items-center text-xs font-bold">
+            <span class="text-slate-400 uppercase tracking-widest">Attendance Metric</span>
+            <span class="text-white">${attendanceRate}% Utilization</span>
+        </div>
+        <div class="text-base font-medium">
+            วันนี้มีนักเรียนเช็คอินเข้าสู่ระบบรวม <span class="text-blue-400 font-bold">${todayLogsCount}</span> จาก <span class="text-slate-400">${totalStudentsInDB}</span> ราย 
+            พบอัตราการมาสายที่ <span class="text-rose-400 font-bold">${Math.round((lates/todayLogsCount)*100 || 0)}%</span> 
+            ซึ่งอยู่ในเกณฑ์ ${lates > (todayLogsCount * 0.3) ? 'ควรเฝ้าระวัง' : 'ปกติ'}
+        </div>
+    </div>`;
     summaryEl.innerHTML = insightStr;
+
+    // 2. Anomaly Detection (Technical Analysis)
+    // Finding students who are much later than their own average
+    const studentAverages = {};
+    allLogs.filter(l => l.type === 'เข้า' && l.status === 'ปกติ' && l.date !== targetDate).forEach(l => {
+        if (!l.time) return;
+        if (!studentAverages[l.student_id]) studentAverages[l.student_id] = [];
+        const [h, m] = l.time.split(':');
+        studentAverages[l.student_id].push(parseInt(h) * 60 + parseInt(m));
+    });
+
+    const anomalies = [];
+    todayLogs.forEach(l => {
+        const history = studentAverages[l.student_id];
+        if (history && history.length >= 2) {
+            const avg = history.reduce((a, b) => a + b, 0) / history.length;
+            const [h, m] = l.time.split(':');
+            const current = parseInt(h) * 60 + parseInt(m);
+            const deviation = current - avg;
+            if (deviation > 20) { // More than 20 mins later than usual
+                anomalies.push({ name: l.name, deviation: Math.round(deviation) });
+            }
+        }
+    });
+
+    anomalyEl.innerHTML = anomalies.map(a => `
+        <div class="p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl mb-2 flex justify-between items-center">
+            <span class="text-[11px] font-bold text-slate-200">${a.name}</span>
+            <span class="text-[10px] font-black text-rose-500 uppercase">Latency: +${a.deviation}m Deviation</span>
+        </div>
+    `).join('') || '<div class="text-[10px] text-slate-600 font-bold italic py-4">No significant behavior deviations detected today.</div>';
+
+    // 3. Student Clusters (Class Performance)
+    const classMap = {};
+    todayLogs.forEach(l => {
+        const cls = l.class_room || 'Unknown';
+        if (!classMap[cls]) classMap[cls] = { total: 0, late: 0 };
+        classMap[cls].total++;
+        if (l.status === 'สาย') classMap[cls].late++;
+    });
+
+    const clusters = Object.entries(classMap).map(([name, s]) => ({
+        name,
+        lateRate: Math.round((s.late / s.total) * 100)
+    })).sort((a,b) => b.lateRate - a.lateRate);
+
+    clusterEl.innerHTML = clusters.slice(0, 3).map(c => `
+        <div class="flex justify-between items-center text-[11px] mb-2 p-1">
+            <span class="text-slate-400">${c.name}</span>
+            <span class="font-black ${c.lateRate > 50 ? 'text-rose-500' : 'text-emerald-500'}">${c.lateRate}% Tardiness</span>
+        </div>
+        <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden mb-4">
+            <div class="h-full ${c.lateRate > 50 ? 'bg-rose-500' : 'bg-emerald-500'}" style="width: ${c.lateRate}%"></div>
+        </div>
+    `).join('') || '<div class="text-[10px] text-slate-600 font-bold italic py-4">Insufficient class-level data.</div>';
 }

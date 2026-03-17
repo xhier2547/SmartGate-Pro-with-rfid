@@ -11,7 +11,26 @@ const { SerialPort } = require('serialport');
 require('dotenv').config();  // ← โหลด .env
 
 const app = express();
-app.use('/js', express.static(path.join(__dirname, 'js'), { maxAge: 0 })); // no-cache: ให้โหลด face_ai.js ใหม่ทุกครั้ง
+app.use('/js', express.static(path.join(__dirname, 'js'), { maxAge: 0 })); 
+
+// --- Update Photo from Scan ---
+app.post('/api/manage/update-photo-from-scan', (req, res) => {
+    const { student_id, epc_code } = req.body;
+    if (!student_id && !epc_code) return res.status(400).json({ success: false, message: "Missing ID or EPC" });
+    const epc = epc_code || "";
+    const scanPath = path.join(__dirname, 'public', 'photos', `scan_${epc}.jpg`);
+    const newProfileName = `profile_${Date.now()}.jpg`;
+    const profilePath = path.join(__dirname, 'public', 'photos', newProfileName);
+    if (!fs.existsSync(scanPath)) return res.status(404).json({ success: false, message: "ไม่พบรูปภาพจากการสแกนล่าสุด" });
+    try {
+        fs.copyFileSync(scanPath, profilePath);
+        db.run("UPDATE students SET photo = ? WHERE student_id = ? OR epc_code = ?", [newProfileName, student_id, epc], (err) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            console.log(`📸 Updated profile photo for ${student_id || epc} using latest scan.`);
+            res.json({ success: true, message: "อัปเดตรูปภาพโปรไฟล์สำเร็จ! ข้อมูล AI จะแม่นยำขึ้นในครั้งถัดไป" });
+        });
+    } catch (e) { res.status(500).json({ success: false, message: "Error updating photo: " + e.message }); }
+});
 app.use('/models', express.static(path.join(__dirname, 'models'), { maxAge: '1d' }));
 app.use('/css', express.static(path.join(__dirname, 'css'), { maxAge: '1d' }));
 app.use('/photos', express.static(path.join(__dirname, 'public', 'photos'), { maxAge: '1d' }));
@@ -48,7 +67,23 @@ if (!fs.existsSync(photosDir)) {
 
 db.serialize(() => {
     db.run(`PRAGMA journal_mode=WAL;`);
-    db.run(`CREATE TABLE IF NOT EXISTS students (epc_code TEXT PRIMARY KEY, student_id TEXT, name TEXT, class_year TEXT, room TEXT, level TEXT, forgot_count INTEGER DEFAULT 0, score INTEGER DEFAULT 100, photo TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS students (epc_code TEXT PRIMARY KEY, student_id TEXT, name TEXT, class_year TEXT, room TEXT, level TEXT, forgot_count INTEGER DEFAULT 0, score INTEGER DEFAULT 100, photo TEXT, parent_name TEXT, parent_phone TEXT)`);
+    
+    // --- Database Migration: Add parent info columns if they don't exist ---
+    const addColumnIfNotExists = (table, col, type) => {
+        db.get(`PRAGMA table_info(${table})`, (err, rows) => {
+            // PRAGMA table_info returns multiple rows, sqlite3 .get only returns first. Use .all.
+        });
+        db.all(`PRAGMA table_info(${table})`, (err, rows) => {
+            if (rows && !rows.find(r => r.name === col)) {
+                db.run(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+                console.log(`📡 Migrated database: Added ${col} to ${table}`);
+            }
+        });
+    };
+    addColumnIfNotExists('students', 'parent_name', 'TEXT');
+    addColumnIfNotExists('students', 'parent_phone', 'TEXT');
+
     db.run(`CREATE TABLE IF NOT EXISTS attendance (id INTEGER PRIMARY KEY AUTOINCREMENT, epc_code TEXT, date TEXT, time TEXT, type TEXT, status TEXT, FOREIGN KEY(epc_code) REFERENCES students(epc_code))`);
     db.run(`CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT, role TEXT)`);
     db.run(`INSERT OR IGNORE INTO users VALUES ('admin', 'password123', 'admin')`);
@@ -125,10 +160,29 @@ app.get('/api/manage/students', (req, res) => {
 
 app.put('/api/manage/students/:epc_code', (req, res) => {
     const epc_code = req.params.epc_code;
-    const { student_id, name, level, class_year, room } = req.body;
+    const { student_id, name, level, class_year, room, parent_name, parent_phone, photo } = req.body;
+    
+    let updatePhotoSql = "";
+    let params = [student_id, name, level, class_year, room, parent_name || '', parent_phone || ''];
+
+    // Handle Base64 photo if provided
+    if (photo && photo.startsWith('data:image')) {
+        const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
+        const fileName = `${student_id || epc_code}_${Date.now()}.jpg`;
+        const filePath = path.join(__dirname, 'public', 'photos', fileName);
+        try {
+            fs.writeFileSync(filePath, base64Data, 'base64');
+            updatePhotoSql = ", photo=?";
+            params.push(`/photos/${fileName}`);
+        } catch (e) {
+            console.error('Error saving updated image:', e);
+        }
+    }
+
+    params.push(epc_code);
     db.run(
-        `UPDATE students SET student_id=?, name=?, level=?, class_year=?, room=? WHERE epc_code=?`,
-        [student_id, name, level, class_year, room, epc_code],
+        `UPDATE students SET student_id=?, name=?, level=?, class_year=?, room=?, parent_name=?, parent_phone=? ${updatePhotoSql} WHERE epc_code=?`,
+        params,
         function (err) {
             if (err) return res.status(500).json({ success: false, message: err.message });
             res.json({ success: true, message: "อัปเดตข้อมูลสำเร็จ" });
@@ -248,21 +302,10 @@ const processScan = (raw_epc) => {
 
     // 2. ระดับ Database (กันการเบิ้ลที่อาจหลุดจาก Cache)
     db.get(
-        "SELECT time FROM attendance WHERE epc_code = ? AND date = ? ORDER BY id DESC LIMIT 1",
+        "SELECT time, type FROM attendance WHERE epc_code = ? AND date = ? ORDER BY id DESC LIMIT 1",
         [epc_code, dateStr],
         (err, lastLog) => {
-            if (lastLog) {
-                const now = new Date();
-                const [h, m] = lastLog.time.split(':').map(Number);
-                const lastTime = new Date();
-                lastTime.setHours(h, m, 0, 0);
-
-                if (now - lastTime < DEBOUNCE_TIME_MS) {
-                    console.log(`⚠️ ป้องกันสแกนซ้ำ (DB): ${epc_code}`);
-                    return;
-                }
-            }
-
+            // NOTE: We moved the 1-minute guard into handleScanLogic for better context (type-aware debounce)
             console.log(`\n${'─'.repeat(50)}`);
             console.log(`📡 สแกนบัตร: ${epc_code}`);
             handleScanLogic(epc_code);
@@ -293,19 +336,22 @@ const handleScanLogic = (epc_code) => {
                     return;
                 }
 
-                // 2.1 ป้องกันการสลับ เข้า/ออก ไวเกินไป (Guard 1 minute)
-                if (lastLog) {
+                // 2.1 ป้องกันการสแกนซ้ำประเภทเดิม (เช่น เข้า แล้วเข้าซ้ำ) ภายใน 1 นาที
+                const nextType = (lastLog && lastLog.type === 'เข้า') ? 'ออก' : 'เข้า';
+
+                if (lastLog && lastLog.type === nextType) {
                     const [h, m] = lastLog.time.split(':').map(Number);
                     const lastTime = new Date();
                     lastTime.setHours(h, m, 0, 0);
-                    if (now - lastTime < 60000) { // 60,000 ms = 1 minute
-                        console.log(`⏳ ข้ามการสแกน: ${epc_code} เพิ่งบันทึกไปเมื่อไม่กี่วินาทีก่อน`);
+                    const diffMs = now - lastTime;
+
+                    // ถ้าเป็นประเภทเดียวกัน และสแกนภายใน 1 นาที สั่งข้าม (ยกเว้นข้ามวัน/ข้ามชั่วโมงที่ต่างกัน)
+                    if (diffMs >= 0 && diffMs < 60000) { 
+                        console.log(`⏳ ข้ามการสแกน: ${epc_code} เพิ่งบันทึก "${lastLog.type}" ไปเมื่อไม่กี่วินาทีก่อน`);
                         pendingScans.delete(epc_code);
                         return;
                     }
                 }
-
-                const nextType = (lastLog && lastLog.type === 'เข้า') ? 'ออก' : 'เข้า';
                 const className = `${student.level}${student.class_year}/${student.room}`;
                 console.log(`👤 [${logTime()}] ${student.name} (${className}) → ${nextType}`);
 
@@ -357,11 +403,19 @@ const handleScanLogic = (epc_code) => {
 
 // Debug: รับ distance log จาก browser AI พิมพ์ใน terminal
 app.post('/api/face-debug', (req, res) => {
-    const { name, sample, distance, pct, threshold } = req.body;
+    const { name, sample, distance, pct, threshold, note } = req.body;
+    
+    if (sample === 'FINAL') {
+        const pass = parseFloat(distance) < threshold ? '✅ PASS' : '❌ FAIL';
+        console.log(`🤖 Final Decision: ${name} | AvgDist=${distance} | ${note} | ${pass}`);
+        console.log(`${'─'.repeat(50)}`);
+        return res.json({ ok: true });
+    }
+
     const filled = Math.max(0, Math.round(pct / 5));
     const bar = '█'.repeat(filled) + '░'.repeat(20 - filled);
     const pass = parseFloat(distance) < threshold ? '✅ PASS' : '❌ ยังไม่ผ่าน';
-    console.log(`   📊 [${bar}] ${pct}% (dist=${distance}) ${pass}`);
+    console.log(`   📊 Sample ${sample}: [${bar}] ${pct}% (dist=${distance}) ${pass}`);
     res.json({ ok: true });
 });
 

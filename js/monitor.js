@@ -51,17 +51,24 @@ async function startDetectionLoop() {
     }, 1000);
 }
 
-// Listen for card scans to trigger AI verification
-const eventSource = new EventSource('/api/events');
-eventSource.onmessage = async (e) => {
-    const data = JSON.parse(e.data);
-    if (data.type === 'verify_face') {
-        updateStatus('Verifying...', 'bg-blue-500 text-white');
-        
+// --- Verification Queue System ---
+let verificationQueue = [];
+let isProcessing = false;
+
+async function processQueue() {
+    if (isProcessing || verificationQueue.length === 0) return;
+    
+    isProcessing = true;
+    const data = verificationQueue.shift();
+    
+    const remaining = verificationQueue.length;
+    updateStatus(remaining > 0 ? `Verifying... (Queued: ${remaining})` : 'Verifying...', 'bg-blue-500 text-white');
+    
+    try {
         // Create canvas for recognition
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
         canvas.getContext('2d').drawImage(video, 0, 0);
         
         // Verify via face_ai.js
@@ -72,8 +79,8 @@ eventSource.onmessage = async (e) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                epc_code: data.student.epc_code, // Use the EPC from the student data
-                attendance_id: data.student.attendance_id, // CRITICAL: Target the specific record
+                epc_code: data.student.epc_code,
+                attendance_id: data.student.attendance_id,
                 status: result,
                 captured_image: canvas.toDataURL('image/jpeg', 0.8)
             })
@@ -82,8 +89,25 @@ eventSource.onmessage = async (e) => {
         if (result === 'ปกติ') {
             showScanSuccess(data.student);
         }
-        
+    } catch (err) {
+        console.error("Queue Processing Error:", err);
+    }
+
+    isProcessing = false;
+    if (verificationQueue.length > 0) {
+        processQueue(); // Process next in line
+    } else {
         updateStatus('Ready', 'bg-emerald-500');
+    }
+}
+
+// Listen for card scans to trigger AI verification
+const eventSource = new EventSource('/api/events');
+eventSource.onmessage = async (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'verify_face') {
+        verificationQueue.push(data);
+        processQueue();
     }
 };
 

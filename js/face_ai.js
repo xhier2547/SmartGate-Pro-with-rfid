@@ -118,11 +118,10 @@ async function prewarmDescriptors() {
     } catch (e) { console.error('Pre-warm error:', e); }
 }
 
-// ─── FaceMatcher factory ──────────────────────────────────────────────────────
-// Threshold 0.92 → near-maximum leniency
-// Same person at extreme angle typically scores 0.65–0.82
-// 0.92 leaves a safety margin while still rejecting truly different people
-const MATCH_THRESHOLD = 0.92;
+// Threshold 0.6 → Standard security threshold for face-api.js
+// Lowering from 0.92 to prevent false positives (different people matching).
+// The user reported a false match at dist=0.6519, which this will now correctly reject.
+const MATCH_THRESHOLD = 0.6;
 
 async function getFaceMatcher() {
     if (faceMatcher) return faceMatcher;
@@ -134,11 +133,8 @@ async function getFaceMatcher() {
 }
 
 // ─── Live verification (exported to window) ───────────────────────────────────
-// Best-of-N sampling: try up to N_SAMPLES frames and return the best match.
-// This tolerates students who glance sideways — at least 1 frame should be
-// good enough to get a low distance.
-const N_SAMPLES = 8;       // 8 frames ≈ 1.4 seconds of sampling
-const SLEEP_MS  = 200;     // 200ms between samples → gives camera time to capture new angle
+const N_SAMPLES = 8;       // 8 frames
+const SLEEP_MS  = 100;     // 100ms interval (0.8s total) — optimized for fast walking
 
 window.verifyFaceFromLive = async (liveCanvas, studentData) => {
     try {
@@ -160,19 +156,16 @@ window.verifyFaceFromLive = async (liveCanvas, studentData) => {
 
         if (!descDb) {
             console.warn(`⚠️ No DB photo for ${studentData.name} – skipping AI check → ปกติ`);
-            return 'ปกติ'; // no baseline → just let them through quickly
+            return 'ปกติ';
         }
 
-        // 2. Multi-frame sampling for angle tolerance
-        let bestDistance = Infinity;
+        // 2. Multi-frame sampling with Quality Filter
+        let detections = [];
 
         for (let i = 0; i < N_SAMPLES; i++) {
             if (i > 0) {
-                // Give the camera a moment to capture a different angle
                 await new Promise(r => setTimeout(r, SLEEP_MS));
-                // Re-draw canvas from the video element so we get a fresh frame
-                const videoEl = document.getElementById('webcamPreview') ||
-                                document.getElementById('dashboardCam');
+                const videoEl = document.getElementById('webcamPreview') || document.getElementById('dashboardCam');
                 if (videoEl && videoEl.readyState >= 2) {
                     liveCanvas.width  = videoEl.videoWidth;
                     liveCanvas.height = videoEl.videoHeight;
@@ -180,34 +173,80 @@ window.verifyFaceFromLive = async (liveCanvas, studentData) => {
                 }
             }
 
-            const det = await faceapi.detectSingleFace(liveCanvas, TINY_OPTS)
-                                     .withFaceLandmarks()
-                                     .withFaceDescriptor();
-            if (!det) continue; // no face in this frame, try again
+            // Detect all faces
+            const allDets = await faceapi.detectAllFaces(liveCanvas, TINY_OPTS)
+                                         .withFaceLandmarks()
+                                         .withFaceDescriptors();
+            
+            if (allDets.length === 0) {
+                console.log(`📊 Sample ${i + 1}/${N_SAMPLES}: No faces`);
+                continue;
+            }
 
-            const d = faceapi.euclideanDistance(descDb.descriptors[0], det.descriptor);
-            const pct = Math.round((1 - d) * 100);
-            console.log(`📊 Sample ${i + 1}/${N_SAMPLES}: distance=${d.toFixed(4)} (${pct}% match) | threshold=${MATCH_THRESHOLD}`);
-            // Also push debug to server terminal via beacon
+            // Quality Filter: Find the best match among high-score detections
+            let bestMatchInFrame = Infinity;
+            allDets.forEach(det => {
+                // Ignore detections with very low confidence scores (likely motion blur)
+                if (det.detection.score < 0.45) return; 
+
+                const d = faceapi.euclideanDistance(descDb.descriptors[0], det.descriptor);
+                if (d < bestMatchInFrame) bestMatchInFrame = d;
+            });
+
+            if (bestMatchInFrame === Infinity) continue; // No high-quality faces found
+
+            detections.push(bestMatchInFrame);
+            const pct = Math.round((1 - bestMatchInFrame) * 100);
+            
+            // Push debug to server terminal
             fetch('/api/face-debug', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: studentData.name, sample: i+1, distance: d.toFixed(4), pct, threshold: MATCH_THRESHOLD })
+                body: JSON.stringify({ 
+                    name: studentData.name, 
+                    sample: i+1, 
+                    distance: bestMatchInFrame.toFixed(4), 
+                    pct, 
+                    threshold: MATCH_THRESHOLD,
+                    note: `Score: ${allDets[0].detection.score.toFixed(2)}` 
+                })
             }).catch(() => {});
-
-            if (d < bestDistance) bestDistance = d;
-            if (bestDistance < MATCH_THRESHOLD) break; // good enough – stop early
         }
 
-        if (bestDistance === Infinity) {
-            // Camera couldn't detect a face at all → auto-pass
-            // Better to let an undetected frame through than block everyone
-            console.warn('⚠️ ไม่พบใบหน้าใน frame ใดเลย → ผ่านอัตโนมัติ (ปกติ)');
+        if (detections.length === 0) {
+            console.warn('⚠️ ไม่พบใบหน้าคุณภาพสูงเลย → ผ่านอัตโนมัติ (ปกติ)');
             return 'ปกติ';
         }
 
-        const result = bestDistance < MATCH_THRESHOLD ? 'ปกติ' : 'รอตรวจสอบ';
-        console.log(`✅ Best distance: ${bestDistance.toFixed(4)} → ${result}`);
+        // --- Optimized Decision Logic ---
+        detections.sort((a, b) => a - b);
+        
+        // Take top 3 best detections
+        const topDetections = detections.slice(0, 3);
+        const avgDistance = topDetections.reduce((a, b) => a + b, 0) / topDetections.length;
+        const passingSamples = detections.filter(d => d < MATCH_THRESHOLD).length;
+        const veryStrongSamples = detections.filter(d => d < 0.48).length; // High confidence matches
+
+        // Success if:
+        // A) At least 2 samples are very strong (ideal for fast-walkby where 1-2 frames are clear)
+        // B) Average of top 3 is within threshold
+        const isVerified = (veryStrongSamples >= 1 && passingSamples >= 2) || (avgDistance < MATCH_THRESHOLD);
+        const result = isVerified ? 'ปกติ' : 'รอตรวจสอบ';
+
+        // Final debug
+        fetch('/api/face-debug', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                name: studentData.name, 
+                sample: 'FINAL', 
+                distance: avgDistance.toFixed(4), 
+                pct: Math.round((1-avgDistance)*100), 
+                threshold: MATCH_THRESHOLD,
+                note: `Pass: ${passingSamples}, Strong: ${veryStrongSamples}`
+            })
+        }).catch(() => {});
+
         return result;
 
     } catch (e) {

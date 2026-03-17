@@ -107,6 +107,49 @@
                             <input type="number" id="edit_room" required min="1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white outline-none focus:border-cyan-500 text-center">
                         </div>
                     </div>
+
+                    <div class="pt-4 border-t border-slate-800 space-y-4">
+                        <h4 class="text-sm font-semibold text-slate-300">👨‍👩‍👧 ข้อมูลผู้ปกครอง</h4>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">ชื่อ-นามสกุล ผู้ปกครอง</label>
+                            <input type="text" id="edit_parent_name" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white outline-none focus:border-cyan-500" placeholder="ระบุชื่อผู้ปกครอง...">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wider">เบอร์โทรศัพท์ติดต่อ</label>
+                            <input type="tel" id="edit_parent_phone" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white outline-none focus:border-cyan-500" placeholder="08x-xxx-xxxx">
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-800 space-y-4">
+                        <h4 class="text-sm font-semibold text-slate-300">📸 รูปภาพประจำตัว</h4>
+                        <div class="flex items-center gap-4">
+                            <div class="relative group">
+                                <img id="edit_photo_preview" src="" class="w-24 h-24 rounded-xl object-cover border-2 border-slate-700 bg-slate-800">
+                                <div class="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="document.getElementById('edit_photo_input').click()">
+                                    <span class="text-[10px] text-white font-bold">เปลี่ยนรูป</span>
+                                </div>
+                            </div>
+                            <div class="flex-1 flex flex-col gap-2">
+                                <button type="button" onclick="startWebcamCapture()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 text-xs font-medium transition-all flex items-center justify-center gap-2">
+                                    📷 ถ่ายรูปจากเครื่อง
+                                </button>
+                                <button type="button" onclick="document.getElementById('edit_photo_input').click()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 text-xs font-medium transition-all flex items-center justify-center gap-2">
+                                    📁 เลือกไฟล์ภาพ
+                                </button>
+                                <input type="file" id="edit_photo_input" accept="image/*" class="hidden" onchange="previewUpload(this)">
+                            </div>
+                        </div>
+                        
+                        <!-- Webcam Container (Hidden by default) -->
+                        <div id="webcam_container" class="hidden flex flex-col gap-3 p-4 bg-slate-800/80 rounded-xl border border-cyan-500/30">
+                            <video id="webcam_video" autoplay playsinline class="w-full rounded-lg bg-black"></video>
+                            <div class="flex gap-2">
+                                <button type="button" onclick="takeSnapshot()" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-bold">📸 ถ่ายทันที</button>
+                                <button type="button" onclick="stopWebcam()" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-bold">ยกเลิก</button>
+                            </div>
+                            <canvas id="snapshot_canvas" class="hidden"></canvas>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mt-8 flex gap-3">
@@ -244,6 +287,9 @@
             document.getElementById('edit_level').value = student.level || 'ป.';
             document.getElementById('edit_class_year').value = student.class_year || 1;
             document.getElementById('edit_room').value = student.room || 1;
+            document.getElementById('edit_parent_name').value = student.parent_name || '';
+            document.getElementById('edit_parent_phone').value = student.parent_phone || '';
+            document.getElementById('edit_photo_preview').src = student.photo || 'https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png';
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -253,7 +299,60 @@
             }, 10);
         }
 
+        // --- Photo Management Logic ---
+        let currentPhotoData = null; // Store base64 of new photo
+        let webcamStream = null;
+
+        function previewUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentPhotoData = e.target.result;
+                    document.getElementById('edit_photo_preview').src = currentPhotoData;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        async function startWebcamCapture() {
+            const container = document.getElementById('webcam_container');
+            const video = document.getElementById('webcam_video');
+            container.classList.remove('hidden');
+            
+            try {
+                webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 400, height: 400 } });
+                video.srcObject = webcamStream;
+            } catch (err) {
+                alert("ไม่สามารถเข้าถึงกล้องได้: " + err.message);
+                container.classList.add('hidden');
+            }
+        }
+
+        function stopWebcam() {
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+            document.getElementById('webcam_container').classList.add('hidden');
+        }
+
+        function takeSnapshot() {
+            const video = document.getElementById('webcam_video');
+            const canvas = document.getElementById('snapshot_canvas');
+            const context = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            currentPhotoData = canvas.toDataURL('image/jpeg', 0.9);
+            document.getElementById('edit_photo_preview').src = currentPhotoData;
+            stopWebcam();
+        }
+
         function closeEditModal() {
+            stopWebcam();
+            currentPhotoData = null;
             modalContent.classList.remove('scale-100', 'opacity-100');
             modalContent.classList.add('scale-95', 'opacity-0');
             setTimeout(() => {
@@ -270,7 +369,10 @@
                 name: document.getElementById('edit_name').value,
                 level: document.getElementById('edit_level').value,
                 class_year: document.getElementById('edit_class_year').value,
-                room: document.getElementById('edit_room').value
+                room: document.getElementById('edit_room').value,
+                parent_name: document.getElementById('edit_parent_name').value,
+                parent_phone: document.getElementById('edit_parent_phone').value,
+                photo: currentPhotoData // Will be null if photo didn't change
             };
 
             try {
